@@ -1,28 +1,15 @@
+version: '3.8'
+
 services:
-  nesventory-plugin:
+  nesventory-gemini-plugin:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # API_KEY must be available at build time for Vite to bake it in
-        - GEMINI_API_KEY=${GEMINI_API_KEY}
-        - PUID=${PUID:-1000}
-        - PGID=${PGID:-1000}
-        - TZ=${TZ:-UTC}
-        - UMASK=${UMASK:-022}
+    container_name: nesventory-gemini-plugin
     ports:
-      - "${HOST_PORT:-8080}:80"
+      - "8000:8000"
     environment:
-      - NODE_ENV=production
-      - TZ=${TZ:-UTC}
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - UMASK=${UMASK:-022}
-    volumes:
-      # Mount for timezone synchronization (optional, alternative to TZ env var)
-      - /etc/localtime:/etc/localtime:ro
-      # Mount for persistent data (if needed in future)
-      # - ./data:/usr/share/nginx/html/data
-    restart: unless-stopped
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     env_file:
       - .env
+    restart: unless-stopped
