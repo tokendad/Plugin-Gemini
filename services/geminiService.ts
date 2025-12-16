@@ -229,15 +229,16 @@ export const findAlternatives = async (base64Data: string, mimeType: string, rej
         properties: {
           name: { type: Type.STRING },
           series: { type: Type.STRING },
-          reason: { type: Type.STRING, description: "Why this might be the correct item based on visual similarity." }
+          reason: { type: Type.STRING, description: "Why this might be the correct item based on visual similarity." },
+          confidenceScore: { type: Type.NUMBER, description: "Confidence score between 0 and 100." }
         },
         required: ["name", "series", "reason"]
       }
     };
 
     const promptText = rejectedName 
-      ? `The user rejected the identification "${rejectedName}" for an item in this image. Search specifically for the correct Department 56 item visible. List the top 3 most likely correct matches.`
-      : "The previous identification of this Department 56 item was rejected by the user. Search specifically for this item's visual match on the web. List the top 3 most likely correct Department 56 items it could be.";
+      ? `The user rejected the identification "${rejectedName}" for an item in this image. Search specifically for the correct Department 56 item visible. List up to 5 possible matches, ordered from most to least likely. Include lower confidence matches that might still be correct.`
+      : "The previous identification of this Department 56 item was rejected by the user. Search specifically for this item's visual match on the web. List up to 5 possible Department 56 items it could be, ordered from most to least likely. Include lower confidence matches.";
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -262,6 +263,72 @@ export const findAlternatives = async (base64Data: string, mimeType: string, rej
 
   } catch (error) {
     console.error("[GeminiService] Find Alternatives Error:", error);
+    throw error;
+  }
+};
+
+export const findAlternativesWithContext = async (
+  base64Data: string, 
+  mimeType: string, 
+  rejectedName: string,
+  userContext: string
+): Promise<AlternativeItem[]> => {
+  console.log("[GeminiService] Searching for alternatives with user context...");
+  if (!process.env.API_KEY) {
+    throw new Error("API Key is missing.");
+  }
+  
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  try {
+    const alternativesSchema: Schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          series: { type: Type.STRING },
+          reason: { type: Type.STRING, description: "Why this might be the correct item based on visual similarity and user context." },
+          confidenceScore: { type: Type.NUMBER, description: "Confidence score between 0 and 100." }
+        },
+        required: ["name", "series", "reason"]
+      }
+    };
+
+    const promptText = `The user rejected the identification "${rejectedName}" for an item in this image.
+    
+Additional context provided by the user: "${userContext}"
+
+Using this context, search specifically for the correct Department 56 item. Consider:
+1. The visual features in the image
+2. The user's additional details (${userContext})
+3. Department 56 catalog history
+
+List up to 5 possible matches that align with both the image and the user's context, ordered from most to least likely.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: {
+        parts: [
+          { inlineData: { mimeType, data: base64Data } },
+          { text: promptText }
+        ]
+      },
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: alternativesSchema
+      }
+    });
+
+    if (!response.text) {
+      throw new Error("No alternatives found.");
+    }
+    
+    return JSON.parse(response.text) as AlternativeItem[];
+
+  } catch (error) {
+    console.error("[GeminiService] Find Alternatives With Context Error:", error);
     throw error;
   }
 };
