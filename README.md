@@ -51,24 +51,24 @@ This plugin implements the [NesVentory Plugin API Specification](https://github.
    docker-compose up -d
    ```
 
-5. The plugin will be available at `http://localhost:8000`
+5. The plugin will be available at `http://localhost:8002`
 
 ### Testing the Plugin
 
 Test the health endpoint:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8002/health
 ```
 
 Test with an image:
 ```bash
-curl -X POST http://localhost:8000/nesventory/identify/image \
+curl -X POST http://localhost:8002/nesventory/identify/image \
   -F "file=@/path/to/your/image.jpg"
 ```
 
 View API documentation:
 ```
-http://localhost:8000/docs
+http://localhost:8002/docs
 ```
 
 ## Configuration in NesVentory
@@ -78,7 +78,7 @@ http://localhost:8000/docs
 3. Configure the plugin:
    - **Name**: Gemini Plugin
    - **Description**: Google Gemini AI-powered item identification
-   - **Endpoint URL**: `http://nesventory-gemini-plugin:8000` (if using Docker network) or `http://<your-host-ip>:8000`
+   - **Endpoint URL**: `http://nesventory-gemini-plugin:8002` (if using Docker network) or `http://<your-host-ip>:8002`
    - **API Key**: Leave empty (authentication not required for this plugin)
    - **Enabled**: ✓
    - **Use for AI Scan Operations**: ✓
@@ -105,7 +105,7 @@ http://localhost:8000/docs
 
 4. Run the server:
    ```bash
-   uvicorn src.api:app --reload --host 0.0.0.0 --port 8000
+   uvicorn src.api:app --reload --host 0.0.0.0 --port 8002
    ```
 
 ## API Endpoints
