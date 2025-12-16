@@ -19,11 +19,14 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data }) => {
   const handleFetchMarket = async () => {
     setLoadingMarket(true);
     setMarketError(null);
+    console.log("[ResultCard] Initiating market data fetch...");
     try {
       const details = await fetchMarketDetails(data.name, data.series);
       setMarketData(details);
-    } catch (err) {
-      setMarketError("Could not retrieve market data at this time.");
+    } catch (err: any) {
+      console.error("[ResultCard] Market Data Fetch Failed:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setMarketError(`Error: ${errorMessage}`);
     } finally {
       setLoadingMarket(false);
     }

@@ -62,13 +62,17 @@ const d56Schema: Schema = {
 };
 
 export const identifyItem = async (base64Data: string, mimeType: string): Promise<D56Item> => {
+  console.log("[GeminiService] Starting identification process...");
+  
   if (!process.env.API_KEY) {
+    console.error("[GeminiService] CRITICAL: API Key is missing in process.env");
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
+    console.log(`[GeminiService] Sending request to model 'gemini-2.5-flash' with mimeType: ${mimeType}`);
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: {
@@ -95,15 +99,21 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
       },
     });
 
+    console.log("[GeminiService] Response received.");
     if (!response.text) {
+      console.error("[GeminiService] Error: No text in response.");
       throw new Error("No response text received from Gemini.");
     }
 
     const data = JSON.parse(response.text) as D56Item;
+    console.log("[GeminiService] Data parsed successfully:", data.name);
     return data;
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("[GeminiService] API Error Details:", error);
+    if (error instanceof Error) {
+      console.error("[GeminiService] Stack:", error.stack);
+    }
     throw error;
   }
 };
@@ -114,7 +124,10 @@ export interface MarketDetails {
 }
 
 export const fetchMarketDetails = async (itemName: string, series: string): Promise<MarketDetails> => {
+  console.log(`[GeminiService] Fetching market details for: ${itemName} (${series})`);
+  
   if (!process.env.API_KEY) {
+    console.error("[GeminiService] CRITICAL: API Key is missing.");
     throw new Error("API Key is missing.");
   }
 
@@ -135,6 +148,7 @@ export const fetchMarketDetails = async (itemName: string, series: string): Prom
     });
 
     if (!response.text) {
+      console.error("[GeminiService] Error: No text in market response.");
       throw new Error("No market data found.");
     }
 
@@ -144,14 +158,15 @@ export const fetchMarketDetails = async (itemName: string, series: string): Prom
       .map((chunk: any) => chunk.web)
       .filter((web: any) => web && web.uri && web.title)
       .map((web: any) => ({ title: web.title, uri: web.uri }));
-
+    
+    console.log("[GeminiService] Market data retrieved. Sources count:", sources.length);
     return {
       summary: response.text,
       sources: sources
     };
 
   } catch (error) {
-    console.error("Market Data Search Error:", error);
+    console.error("[GeminiService] Market Search Error:", error);
     throw error;
   }
 };

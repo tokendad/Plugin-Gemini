@@ -22,18 +22,24 @@ const App: React.FC = () => {
     setResult(null);
 
     try {
+      console.log("[App] Processing image selection...");
       // 3. Process image for API
       const base64Data = await fileToGenerativePart(file);
       
       // 4. Call Gemini
+      console.log("[App] Invoking identifyItem service...");
       const data = await identifyItem(base64Data, file.type);
       
       setResult(data);
       setStatus(AnalysisStatus.SUCCESS);
-    } catch (err) {
-      console.error(err);
+      console.log("[App] Identification successful.");
+    } catch (err: any) {
+      console.error("[App] Analysis Failed. Full Error Object:", err);
       setStatus(AnalysisStatus.ERROR);
-      setError("Failed to analyze image. Please check your API key and try again.");
+      
+      // Extract meaningful error message
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Analysis Error: ${errorMessage}`);
     }
   };
 
@@ -42,6 +48,7 @@ const App: React.FC = () => {
     setStatus(AnalysisStatus.IDLE);
     setResult(null);
     setError(null);
+    console.log("[App] Reset state.");
   };
 
   return (
@@ -114,9 +121,9 @@ const App: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                   </svg>
                 </div>
-                <div>
+                <div className="w-full">
                   <h3 className="text-lg font-semibold text-red-900">Analysis Error</h3>
-                  <p className="text-red-700 mt-1">{error}</p>
+                  <p className="text-red-700 mt-1 break-words font-mono text-sm">{error}</p>
                 </div>
               </div>
             )}
