@@ -50,6 +50,30 @@ const App: React.FC = () => {
     }
   };
 
+  const handleReAnalyze = async () => {
+    if (!imageData) return;
+
+    // Reset UI state for analysis, but keep image data
+    setStatus(AnalysisStatus.ANALYZING);
+    setError(null);
+    setResults([]);
+
+    try {
+      console.log("[App] Re-analyzing image...");
+      // Reuse existing image data
+      const data = await identifyItem(imageData.base64, imageData.mimeType);
+      
+      setResults(data);
+      setStatus(AnalysisStatus.SUCCESS);
+      console.log(`[App] Re-analysis successful. Found ${data.length} items.`);
+    } catch (err: any) {
+      console.error("[App] Re-analysis Failed:", err);
+      setStatus(AnalysisStatus.ERROR);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Re-analysis Error: ${errorMessage}`);
+    }
+  };
+
   const reset = () => {
     setImageSrc(null);
     setStatus(AnalysisStatus.IDLE);
@@ -144,15 +168,28 @@ const App: React.FC = () => {
                   )}
 
                   {status !== AnalysisStatus.ANALYZING && (
-                    <button 
-                      onClick={reset}
-                      className="absolute top-2 right-2 bg-white/90 hover:bg-white text-slate-600 p-2 rounded-full shadow-sm border border-slate-200 transition-colors"
-                      title="Clear Image"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                    <>
+                      <button 
+                        onClick={reset}
+                        className="absolute top-2 right-2 bg-white/90 hover:bg-white text-slate-600 p-2 rounded-full shadow-sm border border-slate-200 transition-colors z-10"
+                        title="Clear Image"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+
+                      <button 
+                        onClick={handleReAnalyze}
+                        className="absolute bottom-2 right-2 bg-white/90 hover:bg-white text-blue-700 px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 transition-colors z-10 flex items-center gap-1.5 text-xs font-semibold"
+                        title="Re-run AI Analysis"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        Re-analyze
+                      </button>
+                    </>
                   )}
                 </div>
               )}
