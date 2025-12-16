@@ -1,0 +1,85 @@
+name: Docker Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_key:
+        description: 'Gemini API Key (will be baked into the image)'
+        required: true
+        type: string
+      tag:
+        description: 'Docker image tag (e.g., latest, v1.0.0)'
+        required: true
+        default: 'latest'
+        type: string
+      registry:
+        description: 'Docker registry'
+        required: true
+        default: 'docker.io'
+        type: choice
+        options:
+          - docker.io
+          - ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Docker Hub
+        if: inputs.registry == 'docker.io'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Log in to GitHub Container Registry
+        if: inputs.registry == 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set image name
+        id: image
+        run: |
+          if [ "${{ inputs.registry }}" == "docker.io" ]; then
+            echo "name=${{ secrets.DOCKER_USERNAME }}/plugin-gemini" >> $GITHUB_OUTPUT
+          else
+            echo "name=ghcr.io/${{ github.repository }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=${{ inputs.tag }}
+      
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            API_KEY=${{ inputs.api_key }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
