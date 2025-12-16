@@ -8,7 +8,7 @@ echo "NesVentory Gemini Plugin Test Suite"
 echo "======================================"
 echo ""
 
-BASE_URL="http://localhost:8000"
+BASE_URL="http://localhost:8002"
 
 # Color codes
 GREEN='\033[0;32m'
