@@ -1,0 +1,15 @@
+services:
+  nesventory-plugin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # API_KEY must be available at build time for Vite to bake it in
+        - API_KEY=${API_KEY}
+    ports:
+      - "8080:80"
+    # Note: Environment variables in 'environment' section are for runtime,
+    # but since this is a static site served by Nginx, the API_KEY
+    # is baked in during the 'build' phase via 'args' above.
+    environment:
+      - NODE_ENV=production
