@@ -44,8 +44,8 @@ The workflow performs the following steps:
 
 ## Image Naming
 
-- **Docker Hub**: Images are tagged as `<DOCKER_USERNAME>/<repository>:<tag>`
-- **GitHub Container Registry**: Images are tagged as `ghcr.io/<owner>/<repository>:<tag>`
+- **Docker Hub**: Images are tagged as `<DOCKER_USERNAME>/plugin-gemini:<tag>`
+- **GitHub Container Registry**: Images are tagged as `ghcr.io/<owner>/plugin-gemini:<tag>`
 
 ## Build Arguments
 

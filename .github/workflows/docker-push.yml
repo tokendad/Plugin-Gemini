@@ -47,16 +47,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Set image name
+        id: image
+        run: |
+          if [ "${{ inputs.registry }}" == "docker.io" ]; then
+            echo "name=${{ secrets.DOCKER_USERNAME }}/plugin-gemini" >> $GITHUB_OUTPUT
+          else
+            echo "name=ghcr.io/${{ github.repository }}" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ inputs.registry == 'docker.io' && secrets.DOCKER_USERNAME || github.repository }}
+          images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=${{ inputs.tag }}
       
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -69,4 +78,4 @@ jobs:
           cache-to: type=gha,mode=max
       
       - name: Image digest
-        run: echo "Image pushed with digest ${{ steps.meta.outputs.digest }}"
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
