@@ -1,0 +1,7 @@
+{
+  "name": "Copy of NesVentory Dept 56 Recognizer",
+  "description": "An AI-powered inventory assistant specifically trained to identify Department 56 village collectibles using computer vision for the NesVentory system.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
