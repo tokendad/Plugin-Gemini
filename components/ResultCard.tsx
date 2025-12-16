@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { D56Item, AlternativeItem } from '../types';
-import { fetchMarketDetails, MarketDetails, findAlternatives, sendFeedback } from '../services/geminiService';
+import { fetchMarketDetails, MarketDetails, findAlternatives, sendFeedback, addToInventory } from '../services/geminiService';
 
 interface ResultCardProps {
   data: D56Item;
@@ -13,9 +13,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   const [loadingMarket, setLoadingMarket] = useState(false);
   const [marketError, setMarketError] = useState<string | null>(null);
   
-  const [feedbackState, setFeedbackState] = useState<'idle' | 'accepted' | 'rejected'>('idle');
+  // Local state for alternatives only (feedback status is now in data)
   const [alternatives, setAlternatives] = useState<AlternativeItem[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
+
+  // Use props for source of truth, default to idle
+  const feedbackState = data.feedbackStatus || 'idle';
 
   // Helper to infer rarity based on dates and item attributes
   const inferRarity = (item: D56Item): string => {
@@ -48,6 +51,20 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
 
   const rarityLabel = inferRarity(data);
 
+  // Validation Logic
+  const currentYear = new Date().getFullYear();
+  const MIN_YEAR = 1976; // Dept 56 founded
+  const MAX_YEAR = currentYear + 1;
+  let yearWarning: string | null = null;
+
+  if (data.yearIntroduced && (data.yearIntroduced < MIN_YEAR || data.yearIntroduced > MAX_YEAR)) {
+    yearWarning = `Introduced Year (${data.yearIntroduced}) is outside valid range (${MIN_YEAR}-${MAX_YEAR}).`;
+  } else if (data.yearRetired && (data.yearRetired < MIN_YEAR || data.yearRetired > MAX_YEAR)) {
+    yearWarning = `Retired Year (${data.yearRetired}) is outside valid range (${MIN_YEAR}-${MAX_YEAR}).`;
+  } else if (data.yearIntroduced && data.yearRetired && data.yearIntroduced > data.yearRetired) {
+    yearWarning = `Invalid Timeline: Introduced (${data.yearIntroduced}) cannot be after Retired (${data.yearRetired}).`;
+  }
+
   const handleCopyJSON = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     alert("JSON data copied to clipboard!");
@@ -70,15 +87,18 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   };
 
   const handleAccept = async () => {
-    setFeedbackState('accepted');
-    console.log(`[ResultCard] User accepted: ${data.name}. Submitting to training endpoint...`);
-    // Send valid data to backend for training
+    console.log(`[ResultCard] User accepted: ${data.name}. Adding to inventory and submitting feedback...`);
+    // 1. Add to Inventory
+    await addToInventory(data);
+    // 2. Send Feedback
     await sendFeedback(data, imageData);
+    
+    onUpdateData({ ...data, feedbackStatus: 'accepted' });
   };
 
   const handleReject = async () => {
-    setFeedbackState('rejected');
     console.log(`[ResultCard] User rejected: ${data.name}. Fetching alternatives...`);
+    onUpdateData({ ...data, feedbackStatus: 'rejected' });
     
     if (imageData) {
       setLoadingAlternatives(true);
@@ -95,15 +115,20 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
 
   const handleSelectAlternative = async (alt: AlternativeItem) => {
     // Merge the alternative info into the main data structure
-    const newData = { ...data, name: alt.name, series: alt.series, description: `${alt.reason} (User Corrected)` };
+    const newData: D56Item = { 
+        ...data, 
+        name: alt.name, 
+        series: alt.series, 
+        description: `${alt.reason} (User Corrected)`,
+        feedbackStatus: 'accepted' 
+    };
     
     // Update local state
     onUpdateData(newData);
-    setFeedbackState('accepted'); // Auto-accept after correction
     setAlternatives([]); // Clear alternatives
     
-    console.log(`[ResultCard] User corrected item to: ${newData.name}. Submitting correction...`);
-    // Send corrected data to backend for training
+    console.log(`[ResultCard] User corrected item to: ${newData.name}. Processing...`);
+    await addToInventory(newData);
     await sendFeedback(newData, imageData);
   };
 
@@ -140,6 +165,23 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Warning Section for Data Validation */}
+        {yearWarning && (
+          <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-amber-700 font-medium">Data Validation Warning</p>
+                <p className="text-sm text-amber-600 mt-1">{yearWarning}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Primary Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1">
@@ -226,7 +268,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
-                Confirm
+                Confirm & Add
               </button>
             </div>
           </div>

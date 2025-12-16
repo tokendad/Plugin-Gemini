@@ -3,7 +3,9 @@ import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { ResultCard } from './components/ResultCard';
 import { AnalysisStatus, D56Item } from './types';
-import { identifyItem, fileToGenerativePart } from './services/geminiService';
+import { identifyItem, fileToGenerativePart, sendFeedback, addToInventory } from './services/geminiService';
+
+type SortOption = 'confidence-desc' | 'confidence-asc' | 'name-asc' | 'name-desc';
 
 const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -11,6 +13,8 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<AnalysisStatus>(AnalysisStatus.IDLE);
   const [results, setResults] = useState<D56Item[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isAcceptingAll, setIsAcceptingAll] = useState(false);
+  const [sortOption, setSortOption] = useState<SortOption>('confidence-desc');
 
   const handleImageSelect = async (file: File) => {
     // 1. Show preview
@@ -61,6 +65,57 @@ const App: React.FC = () => {
       newResults[index] = newData;
       return newResults;
     });
+  };
+
+  const handleAcceptAll = async () => {
+    if (results.length === 0 || !imageData) return;
+    
+    setIsAcceptingAll(true);
+    console.log("[App] Batch accepting all items...");
+    
+    try {
+      // Trigger feedback AND add to inventory for all items that haven't been rejected
+      const promises = results
+        .filter(item => item.feedbackStatus !== 'rejected')
+        .map(async item => {
+           await addToInventory(item);
+           await sendFeedback(item, imageData);
+        });
+      
+      await Promise.all(promises);
+
+      // Update all items to accepted
+      setResults(prev => prev.map(item => 
+        item.feedbackStatus === 'rejected' ? item : { ...item, feedbackStatus: 'accepted' }
+      ));
+      
+    } catch (e) {
+      console.error("[App] Error in batch accept:", e);
+    } finally {
+      setIsAcceptingAll(false);
+    }
+  };
+
+  // Logic to sort results while maintaining correct index references for updates
+  const getSortedResultsWithIndices = () => {
+    const indexedResults = results.map((item, index) => ({ item, index }));
+    
+    indexedResults.sort((a, b) => {
+      switch (sortOption) {
+        case 'confidence-desc':
+          return b.item.confidenceScore - a.item.confidenceScore;
+        case 'confidence-asc':
+          return a.item.confidenceScore - b.item.confidenceScore;
+        case 'name-asc':
+          return a.item.name.localeCompare(b.item.name);
+        case 'name-desc':
+          return b.item.name.localeCompare(a.item.name);
+        default:
+          return 0;
+      }
+    });
+    
+    return indexedResults;
   };
 
   return (
@@ -156,14 +211,54 @@ const App: React.FC = () => {
 
             {results.length > 0 && (
                <div className="space-y-6">
-                 <div className="flex items-center justify-between pb-2">
+                 {/* Header & Controls */}
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 gap-4">
                    <h3 className="text-slate-500 font-medium text-sm uppercase tracking-wide">
                      Found {results.length} Item{results.length !== 1 ? 's' : ''}
                    </h3>
+                   
+                   <div className="flex items-center gap-3">
+                     {/* Sorting Dropdown */}
+                     <select 
+                       value={sortOption}
+                       onChange={(e) => setSortOption(e.target.value as SortOption)}
+                       className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                     >
+                       <option value="confidence-desc">Sort: Confidence (High-Low)</option>
+                       <option value="confidence-asc">Sort: Confidence (Low-High)</option>
+                       <option value="name-asc">Sort: Name (A-Z)</option>
+                       <option value="name-desc">Sort: Name (Z-A)</option>
+                     </select>
+
+                     {/* Accept All Button */}
+                     {results.some(item => item.feedbackStatus !== 'accepted') && (
+                        <button 
+                          onClick={handleAcceptAll}
+                          disabled={isAcceptingAll}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                        >
+                           {isAcceptingAll ? (
+                             <>
+                               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                               Adding...
+                             </>
+                           ) : (
+                             <>
+                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                 <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                               </svg>
+                               Accept All
+                             </>
+                           )}
+                        </button>
+                     )}
+                   </div>
                  </div>
-                 {results.map((item, index) => (
+
+                 {/* Results List - Mapped from Sorted List */}
+                 {getSortedResultsWithIndices().map(({ item, index }) => (
                    <ResultCard 
-                     key={`${index}-${item.name}`}
+                     key={`${index}-${item.name}`} // Using stable ID concept, though index logic here assumes list doesn't shift
                      data={item} 
                      imageData={imageData}
                      onUpdateData={(newData) => handleUpdateItem(index, newData)}

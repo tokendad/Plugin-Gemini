@@ -266,17 +266,42 @@ export const findAlternatives = async (base64Data: string, mimeType: string, rej
   }
 };
 
+// --- API Endpoint Simulations ---
+
+// 1. Add to Inventory Endpoint
+export const addToInventory = async (item: D56Item): Promise<boolean> => {
+  console.log(`[GeminiService] Adding item to inventory: ${item.name}`);
+  const INVENTORY_ENDPOINT = 'https://api.nesventory.com/v1/inventory/items';
+  
+  try {
+     const response = await fetch(INVENTORY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item)
+     });
+     
+     if (!response.ok) {
+       console.warn(`[GeminiService] Inventory API returned status: ${response.status}`);
+       // In a real app, you might throw here, but for this demo we'll proceed
+     }
+     return true;
+  } catch (e) {
+     console.log("[GeminiService] Inventory API simulated success (No backend running).");
+     // Simulate network latency
+     await new Promise(r => setTimeout(r, 500));
+     return true;
+  }
+};
+
+// 2. Training/Feedback Endpoint
 export const sendFeedback = async (item: D56Item, imageData?: { base64: string; mimeType: string } | null): Promise<void> => {
   console.log(`[GeminiService] Sending training feedback for item: ${item.name}`);
   
-  // This endpoint represents your backend service that collects training data
   const TRAINING_ENDPOINT = 'https://api.nesventory.com/v1/training/submit';
 
   try {
-    // Construct the training payload
     const payload = {
       itemData: item,
-      // In a real scenario, you might send the full image or a reference ID
       imageMeta: imageData ? { 
         mimeType: imageData.mimeType, 
         size: imageData.base64.length 
@@ -288,9 +313,6 @@ export const sendFeedback = async (item: D56Item, imageData?: { base64: string; 
 
     console.log("[GeminiService] Posting to:", TRAINING_ENDPOINT);
     
-    // Attempt the fetch
-    // Note: Since this is a demo environment, this fetch might fail (404/Network Error). 
-    // We catch it to prevent UI disruption.
     try {
         const response = await fetch(TRAINING_ENDPOINT, {
           method: 'POST',
@@ -302,11 +324,9 @@ export const sendFeedback = async (item: D56Item, imageData?: { base64: string; 
             console.warn(`[GeminiService] Endpoint returned status: ${response.status}`);
         }
     } catch (networkError) {
-        // Expected in demo/local environment without running backend
         console.log("[GeminiService] Network request simulated (No backend running). Data ready for training.");
     }
     
-    // Artificial delay to simulate processing
     await new Promise(resolve => setTimeout(resolve, 600));
 
   } catch (error) {

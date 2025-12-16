@@ -10,6 +10,7 @@ export interface D56Item {
   confidenceScore: number;
   isLimitedEdition: boolean;
   isSigned: boolean;
+  feedbackStatus?: 'idle' | 'accepted' | 'rejected';
 }
 
 export interface AlternativeItem {
