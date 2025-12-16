@@ -16,9 +16,7 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
   });
 };
 
-const d56Schema: Schema = {
-  type: Type.OBJECT,
-  properties: {
+const d56ItemProperties = {
     name: {
       type: Type.STRING,
       description: "The specific name of the Department 56 item (e.g., 'Stone Cottage', 'Main Street Station', 'Santa\'s Workshop').",
@@ -57,12 +55,33 @@ const d56Schema: Schema = {
       type: Type.NUMBER,
       description: "Confidence score between 0 and 100.",
     },
-  },
-  required: ["name", "series", "description", "isDepartment56", "estimatedCondition"],
+    isLimitedEdition: {
+      type: Type.BOOLEAN,
+      description: "True if the item is explicitly marked as 'Limited Edition', 'Special Edition', has a visible edition number (e.g. 1234/5000), or is a known limited run type.",
+    },
+    isSigned: {
+      type: Type.BOOLEAN,
+      description: "True if a hand-written signature (e.g. by artist Neely Boldt) is visible on the piece or box.",
+    },
 };
 
-export const identifyItem = async (base64Data: string, mimeType: string): Promise<D56Item> => {
-  console.log("[GeminiService] Starting specialized Dept 56 identification...");
+const d56Schema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    items: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: d56ItemProperties,
+        required: ["name", "series", "description", "isDepartment56", "estimatedCondition", "isLimitedEdition", "isSigned"],
+      }
+    }
+  },
+  required: ["items"],
+};
+
+export const identifyItem = async (base64Data: string, mimeType: string): Promise<D56Item[]> => {
+  console.log("[GeminiService] Starting specialized Dept 56 identification (Multi-item)...");
   
   if (!process.env.API_KEY) {
     console.error("[GeminiService] CRITICAL: API Key is missing in process.env");
@@ -89,8 +108,10 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
       3. **Specialty Series**: Halloween, Disney, Grinch, Harry Potter.
 
       YOUR GOAL:
-      Identify the item with high precision. Differentiate authentic Dept 56 from competitors like Lemax or St. Nicholas Square. 
-      If it is NOT Department 56, flag it immediately.
+      Analyze the image and identify **ALL** distinct Department 56 items visible. 
+      The image may contain a group of items (e.g. a house and accessories). Separate them into individual entries.
+      Differentiate authentic Dept 56 from competitors like Lemax. 
+      If an item is NOT Department 56, flag it immediately.
     `;
 
     const response = await ai.models.generateContent({
@@ -106,15 +127,13 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
           {
             text: `Analyze this image for the inventory.
             
-            1. **Identify**: What specific Department 56 piece is this? Use box text if available.
-            2. **Series**: Classify it into the correct Village (e.g., Snow Village vs Heritage Village).
-            3. **Condition Check**: Look closely for:
-               - Chipped "snow" on roofs or bases.
-               - Missing delicate parts (flags, birds, weathervanes).
-               - Box condition (water damage, tears).
-            4. **Validation**: Check for the Department 56 logo/bottom stamp.
+            1. **Identify**: List all specific Department 56 pieces found in the image. Use box text if available.
+            2. **Series**: Classify each into the correct Village.
+            3. **Condition Check**: Look closely for chips, missing parts, or box wear for each.
+            4. **Rarity Indicators**: Check for "Limited Edition" text, edition numbers, or artist signatures.
+            5. **Validation**: Check for the Department 56 logo.
             
-            Return the data matching the JSON schema.`
+            Return the data matching the JSON schema, with a list of items.`
           }
         ],
       },
@@ -131,9 +150,9 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
       throw new Error("No response text received from Gemini.");
     }
 
-    const data = JSON.parse(response.text) as D56Item;
-    console.log("[GeminiService] Data parsed successfully:", data.name);
-    return data;
+    const data = JSON.parse(response.text) as { items: D56Item[] };
+    console.log(`[GeminiService] Parsed ${data.items?.length || 0} items.`);
+    return data.items || [];
 
   } catch (error) {
     console.error("[GeminiService] API Error Details:", error);
@@ -194,7 +213,7 @@ export const fetchMarketDetails = async (itemName: string, series: string): Prom
   }
 };
 
-export const findAlternatives = async (base64Data: string, mimeType: string): Promise<AlternativeItem[]> => {
+export const findAlternatives = async (base64Data: string, mimeType: string, rejectedName?: string): Promise<AlternativeItem[]> => {
   console.log("[GeminiService] Searching for alternatives...");
   if (!process.env.API_KEY) {
     throw new Error("API Key is missing.");
@@ -216,12 +235,16 @@ export const findAlternatives = async (base64Data: string, mimeType: string): Pr
       }
     };
 
+    const promptText = rejectedName 
+      ? `The user rejected the identification "${rejectedName}" for an item in this image. Search specifically for the correct Department 56 item visible. List the top 3 most likely correct matches.`
+      : "The previous identification of this Department 56 item was rejected by the user. Search specifically for this item's visual match on the web. List the top 3 most likely correct Department 56 items it could be.";
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
-          { text: "The previous identification of this Department 56 item was rejected by the user. Search specifically for this item's visual match on the web. List the top 3 most likely correct Department 56 items it could be. Focus on finding the exact model name." }
+          { text: promptText }
         ]
       },
       config: {

@@ -8,6 +8,8 @@ export interface D56Item {
   description: string;
   isDepartment56: boolean;
   confidenceScore: number;
+  isLimitedEdition: boolean;
+  isSigned: boolean;
 }
 
 export interface AlternativeItem {

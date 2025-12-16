@@ -17,23 +17,36 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   const [alternatives, setAlternatives] = useState<AlternativeItem[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
 
-  // Helper to infer rarity based on dates
-  const inferRarity = (intro: number | null, retired: number | null): string => {
+  // Helper to infer rarity based on dates and item attributes
+  const inferRarity = (item: D56Item): string => {
+    const { yearIntroduced: intro, yearRetired: retired, isLimitedEdition, isSigned } = item;
+
+    // 1. Explicit Rarity Markers (Highest Priority)
+    if (isSigned) return "Artist Signed (High Value)";
+    if (isLimitedEdition) return "Limited Edition";
+
+    // 2. Production Run Analysis
     if (!retired) return "Common (Active)";
-    // If we don't know when it was introduced, but it is retired, we assume standard unless very old
-    if (!intro && retired) return retired < 2000 ? "Vintage" : "Standard";
-    if (!intro) return "Unknown";
+    
+    // Handle unknown intro date
+    if (!intro) {
+       return retired < 2000 ? "Vintage (Date Unknown)" : "Standard (Retired)";
+    }
     
     const yearsActive = retired - intro;
-    
+
+    // 3. Short Run & Vintage Logic
+    if (yearsActive <= 1) return "Very High (1 Year Run)";
     if (yearsActive <= 2) return "High (Short Run)";
+    
     if (retired < 1990) return "Very Vintage";
     if (retired < 2005) return "Vintage";
     if (yearsActive > 15) return "Common (Long Run)";
+    
     return "Standard (Retired)";
   };
 
-  const rarityLabel = inferRarity(data.yearIntroduced, data.yearRetired);
+  const rarityLabel = inferRarity(data);
 
   const handleCopyJSON = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -70,7 +83,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
     if (imageData) {
       setLoadingAlternatives(true);
       try {
-        const alts = await findAlternatives(imageData.base64, imageData.mimeType);
+        const alts = await findAlternatives(imageData.base64, imageData.mimeType, data.name);
         setAlternatives(alts);
       } catch (e) {
         console.error("Failed to find alternatives", e);
@@ -161,13 +174,30 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
 
         {/* Description & Condition */}
         <div className="space-y-4 pt-4 border-t border-slate-100">
-           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Condition Assessment</label>
-            <div className="text-sm text-slate-700 bg-amber-50 p-2 rounded-md border border-amber-100">
-              {data.estimatedCondition}
-            </div>
-          </div>
-          <div className="space-y-1">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Condition Assessment</label>
+                <div className="text-sm text-slate-700 bg-amber-50 p-2 rounded-md border border-amber-100">
+                  {data.estimatedCondition}
+                </div>
+              </div>
+              <div className="space-y-1">
+                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Special Features</label>
+                 <div className="flex gap-2 flex-wrap">
+                   {data.isLimitedEdition && (
+                     <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">Limited Edition</span>
+                   )}
+                   {data.isSigned && (
+                     <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">Artist Signed</span>
+                   )}
+                   {!data.isLimitedEdition && !data.isSigned && (
+                     <span className="text-sm text-slate-400 italic">None detected</span>
+                   )}
+                 </div>
+              </div>
+           </div>
+
+          <div className="space-y-1 pt-2">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Description</label>
             <p className="text-sm text-slate-600 leading-relaxed">
               {data.description}

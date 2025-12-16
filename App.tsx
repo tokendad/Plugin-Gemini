@@ -9,7 +9,7 @@ const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageData, setImageData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>(AnalysisStatus.IDLE);
-  const [result, setResult] = useState<D56Item | null>(null);
+  const [results, setResults] = useState<D56Item[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const handleImageSelect = async (file: File) => {
@@ -20,7 +20,7 @@ const App: React.FC = () => {
     // 2. Reset state
     setStatus(AnalysisStatus.ANALYZING);
     setError(null);
-    setResult(null);
+    setResults([]);
     setImageData(null);
 
     try {
@@ -33,9 +33,9 @@ const App: React.FC = () => {
       console.log("[App] Invoking identifyItem service...");
       const data = await identifyItem(base64Data, file.type);
       
-      setResult(data);
+      setResults(data);
       setStatus(AnalysisStatus.SUCCESS);
-      console.log("[App] Identification successful.");
+      console.log(`[App] Identification successful. Found ${data.length} items.`);
     } catch (err: any) {
       console.error("[App] Analysis Failed. Full Error Object:", err);
       setStatus(AnalysisStatus.ERROR);
@@ -49,10 +49,18 @@ const App: React.FC = () => {
   const reset = () => {
     setImageSrc(null);
     setStatus(AnalysisStatus.IDLE);
-    setResult(null);
+    setResults([]);
     setError(null);
     setImageData(null);
     console.log("[App] Reset state.");
+  };
+
+  const handleUpdateItem = (index: number, newData: D56Item) => {
+    setResults(prevResults => {
+      const newResults = [...prevResults];
+      newResults[index] = newData;
+      return newResults;
+    });
   };
 
   return (
@@ -76,7 +84,7 @@ const App: React.FC = () => {
                   {status === AnalysisStatus.ANALYZING && (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
-                      <p className="text-blue-800 font-medium animate-pulse">Analyzing Dept 56 markers...</p>
+                      <p className="text-blue-800 font-medium animate-pulse">Scanning for Dept 56 items...</p>
                     </div>
                   )}
 
@@ -99,9 +107,9 @@ const App: React.FC = () => {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-blue-900 mb-2">Tips for best results:</h3>
               <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside opacity-80">
-                <li>Capture the item clearly on a plain background.</li>
-                <li>If available, include the original box in the photo.</li>
-                <li>Ensure the bottom stamp is visible if identifying a loose piece.</li>
+                <li>Capture the item(s) clearly on a plain background.</li>
+                <li>You can photograph multiple items at once.</li>
+                <li>If available, include the original boxes.</li>
               </ul>
             </div>
           </div>
@@ -132,12 +140,36 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {result && (
-              <ResultCard 
-                data={result} 
-                imageData={imageData}
-                onUpdateData={setResult}
-              />
+            {status === AnalysisStatus.SUCCESS && results.length === 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 flex items-start gap-4">
+                <div className="bg-amber-100 p-2 rounded-full">
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-amber-700">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clipRule="evenodd" />
+                   </svg>
+                </div>
+                <div>
+                   <h3 className="text-sm font-medium text-amber-900">No items found</h3>
+                   <p className="text-xs text-amber-700 mt-1">We couldn't detect any specific Department 56 items in this image. Try moving closer or improving lighting.</p>
+                </div>
+              </div>
+            )}
+
+            {results.length > 0 && (
+               <div className="space-y-6">
+                 <div className="flex items-center justify-between pb-2">
+                   <h3 className="text-slate-500 font-medium text-sm uppercase tracking-wide">
+                     Found {results.length} Item{results.length !== 1 ? 's' : ''}
+                   </h3>
+                 </div>
+                 {results.map((item, index) => (
+                   <ResultCard 
+                     key={`${index}-${item.name}`}
+                     data={item} 
+                     imageData={imageData}
+                     onUpdateData={(newData) => handleUpdateItem(index, newData)}
+                   />
+                 ))}
+               </div>
             )}
           </div>
 
