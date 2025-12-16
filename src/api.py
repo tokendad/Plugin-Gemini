@@ -5,6 +5,7 @@ This plugin uses Google Gemini AI to identify Department 56 collectibles
 from images.
 """
 
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -115,9 +116,11 @@ app = FastAPI(
 )
 
 # Enable CORS for integration with NesVentory
+# Note: In production, configure allow_origins with specific domain(s) instead of "*"
+# Example: allow_origins=["https://your-nesventory-domain.com"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # TODO: Configure for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -256,7 +259,6 @@ If you don't see any Department 56 items, return: {"items": []}
             )
             
             # Parse response
-            import json
             result_text = response.text
             
             # Try to parse JSON response
@@ -392,7 +394,6 @@ Use null for any field you cannot determine from the image.
         )
         
         # Parse response
-        import json
         result_data = json.loads(response.text)
         
         return DataTagResponse(
@@ -474,7 +475,6 @@ If you cannot identify the barcode, return: {{"found": false}}
         )
         
         # Parse response
-        import json
         result_data = json.loads(response.text)
         
         return BarcodeResponse(
