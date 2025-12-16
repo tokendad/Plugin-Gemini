@@ -5,11 +5,24 @@ services:
       dockerfile: Dockerfile
       args:
         # API_KEY must be available at build time for Vite to bake it in
-        - API_KEY=${API_KEY}
+        - GEMINI_API_KEY=${GEMINI_API_KEY}
+        - PUID=${PUID:-1000}
+        - PGID=${PGID:-1000}
+        - TZ=${TZ:-UTC}
+        - UMASK=${UMASK:-022}
     ports:
-      - "8080:80"
-    # Note: Environment variables in 'environment' section are for runtime,
-    # but since this is a static site served by Nginx, the API_KEY
-    # is baked in during the 'build' phase via 'args' above.
+      - "${HOST_PORT:-8080}:80"
     environment:
       - NODE_ENV=production
+      - TZ=${TZ:-UTC}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - UMASK=${UMASK:-022}
+    volumes:
+      # Mount for timezone synchronization (optional, alternative to TZ env var)
+      - /etc/localtime:/etc/localtime:ro
+      # Mount for persistent data (if needed in future)
+      # - ./data:/usr/share/nginx/html/data
+    restart: unless-stopped
+    env_file:
+      - .env
