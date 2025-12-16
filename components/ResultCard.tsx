@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { D56Item, AlternativeItem } from '../types';
-import { fetchMarketDetails, MarketDetails, findAlternatives } from '../services/geminiService';
+import { fetchMarketDetails, MarketDetails, findAlternatives, sendFeedback } from '../services/geminiService';
 
 interface ResultCardProps {
   data: D56Item;
@@ -16,6 +16,24 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   const [feedbackState, setFeedbackState] = useState<'idle' | 'accepted' | 'rejected'>('idle');
   const [alternatives, setAlternatives] = useState<AlternativeItem[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
+
+  // Helper to infer rarity based on dates
+  const inferRarity = (intro: number | null, retired: number | null): string => {
+    if (!retired) return "Common (Active)";
+    // If we don't know when it was introduced, but it is retired, we assume standard unless very old
+    if (!intro && retired) return retired < 2000 ? "Vintage" : "Standard";
+    if (!intro) return "Unknown";
+    
+    const yearsActive = retired - intro;
+    
+    if (yearsActive <= 2) return "High (Short Run)";
+    if (retired < 1990) return "Very Vintage";
+    if (retired < 2005) return "Vintage";
+    if (yearsActive > 15) return "Common (Long Run)";
+    return "Standard (Retired)";
+  };
+
+  const rarityLabel = inferRarity(data.yearIntroduced, data.yearRetired);
 
   const handleCopyJSON = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -38,10 +56,11 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
     }
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
     setFeedbackState('accepted');
-    console.log(`[ResultCard] User accepted: ${data.name}. This feedback would be used for model training.`);
-    // Here you would typically send this data to your backend as a positive training example
+    console.log(`[ResultCard] User accepted: ${data.name}. Submitting to training endpoint...`);
+    // Send valid data to backend for training
+    await sendFeedback(data, imageData);
   };
 
   const handleReject = async () => {
@@ -61,12 +80,18 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
     }
   };
 
-  const handleSelectAlternative = (alt: AlternativeItem) => {
+  const handleSelectAlternative = async (alt: AlternativeItem) => {
     // Merge the alternative info into the main data structure
     const newData = { ...data, name: alt.name, series: alt.series, description: `${alt.reason} (User Corrected)` };
+    
+    // Update local state
     onUpdateData(newData);
     setFeedbackState('accepted'); // Auto-accept after correction
     setAlternatives([]); // Clear alternatives
+    
+    console.log(`[ResultCard] User corrected item to: ${newData.name}. Submitting correction...`);
+    // Send corrected data to backend for training
+    await sendFeedback(newData, imageData);
   };
 
   if (!data.isDepartment56) {
@@ -124,7 +149,11 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Retired</label>
             <div className="text-sm font-medium text-slate-900">{data.yearRetired || 'Active'}</div>
           </div>
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rarity</label>
+            <div className="text-sm font-medium text-purple-600 truncate" title={rarityLabel}>{rarityLabel}</div>
+          </div>
+          <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Est. Value</label>
             <div className="text-sm font-medium text-emerald-600">{data.estimatedValueRange}</div>
           </div>
