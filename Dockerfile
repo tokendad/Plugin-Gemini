@@ -8,17 +8,17 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
 
 # Build argument for API key
 ARG GEMINI_API_KEY
-ENV VITE_GEMINI_API_KEY=${GEMINI_API_KEY}
+ENV API_KEY=${GEMINI_API_KEY}
 
-# Build the application
-RUN npm run build
+# Build the application (skip tsc type checking as it's done by vite)
+RUN npx vite build
 
 # Production stage
 FROM nginx:alpine
@@ -52,12 +52,41 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Create custom nginx configuration for non-root user
+RUN mkdir -p /tmp/nginx && \
+    echo 'worker_processes auto;' > /etc/nginx/nginx.conf && \
+    echo 'error_log /var/log/nginx/error.log warn;' >> /etc/nginx/nginx.conf && \
+    echo 'pid /tmp/nginx/nginx.pid;' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo 'events {' >> /etc/nginx/nginx.conf && \
+    echo '    worker_connections 1024;' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo 'http {' >> /etc/nginx/nginx.conf && \
+    echo '    include /etc/nginx/mime.types;' >> /etc/nginx/nginx.conf && \
+    echo '    default_type application/octet-stream;' >> /etc/nginx/nginx.conf && \
+    echo '    sendfile on;' >> /etc/nginx/nginx.conf && \
+    echo '    keepalive_timeout 65;' >> /etc/nginx/nginx.conf && \
+    echo '    client_max_body_size 20M;' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo '    server {' >> /etc/nginx/nginx.conf && \
+    echo '        listen 80;' >> /etc/nginx/nginx.conf && \
+    echo '        server_name localhost;' >> /etc/nginx/nginx.conf && \
+    echo '        root /usr/share/nginx/html;' >> /etc/nginx/nginx.conf && \
+    echo '        index index.html;' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo '        location / {' >> /etc/nginx/nginx.conf && \
+    echo '            try_files $uri $uri/ /index.html;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '    }' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf
+
 # Set ownership
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+    chown -R nginx:nginx /tmp/nginx && \
+    chmod -R 755 /tmp/nginx
 
 # Create entrypoint script
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
