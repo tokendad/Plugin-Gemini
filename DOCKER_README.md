@@ -374,13 +374,13 @@ This repository includes a GitHub Actions workflow for automatically building an
 2. Set the API key:
    ```bash
    # Linux/Mac
-   export VITE_GEMINI_API_KEY=your_key
+   export API_KEY=your_key
    
    # Windows (Command Prompt)
-   set VITE_GEMINI_API_KEY=your_key
+   set API_KEY=your_key
    
    # Windows (PowerShell)
-   $env:VITE_GEMINI_API_KEY="your_key"
+   $env:API_KEY="your_key"
    ```
 
 3. Start development server:
