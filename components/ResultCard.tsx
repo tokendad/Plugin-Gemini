@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
-import { D56Item } from '../types';
-import { fetchMarketDetails, MarketDetails } from '../services/geminiService';
+import { D56Item, AlternativeItem } from '../types';
+import { fetchMarketDetails, MarketDetails, findAlternatives } from '../services/geminiService';
 
 interface ResultCardProps {
   data: D56Item;
+  imageData: { base64: string; mimeType: string } | null;
+  onUpdateData: (newData: D56Item) => void;
 }
 
-export const ResultCard: React.FC<ResultCardProps> = ({ data }) => {
+export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdateData }) => {
   const [marketData, setMarketData] = useState<MarketDetails | null>(null);
   const [loadingMarket, setLoadingMarket] = useState(false);
   const [marketError, setMarketError] = useState<string | null>(null);
+  
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'accepted' | 'rejected'>('idle');
+  const [alternatives, setAlternatives] = useState<AlternativeItem[]>([]);
+  const [loadingAlternatives, setLoadingAlternatives] = useState(false);
 
   const handleCopyJSON = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -32,6 +38,37 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data }) => {
     }
   };
 
+  const handleAccept = () => {
+    setFeedbackState('accepted');
+    console.log(`[ResultCard] User accepted: ${data.name}. This feedback would be used for model training.`);
+    // Here you would typically send this data to your backend as a positive training example
+  };
+
+  const handleReject = async () => {
+    setFeedbackState('rejected');
+    console.log(`[ResultCard] User rejected: ${data.name}. Fetching alternatives...`);
+    
+    if (imageData) {
+      setLoadingAlternatives(true);
+      try {
+        const alts = await findAlternatives(imageData.base64, imageData.mimeType);
+        setAlternatives(alts);
+      } catch (e) {
+        console.error("Failed to find alternatives", e);
+      } finally {
+        setLoadingAlternatives(false);
+      }
+    }
+  };
+
+  const handleSelectAlternative = (alt: AlternativeItem) => {
+    // Merge the alternative info into the main data structure
+    const newData = { ...data, name: alt.name, series: alt.series, description: `${alt.reason} (User Corrected)` };
+    onUpdateData(newData);
+    setFeedbackState('accepted'); // Auto-accept after correction
+    setAlternatives([]); // Clear alternatives
+  };
+
   if (!data.isDepartment56) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
@@ -49,9 +86,19 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data }) => {
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="border-b border-slate-100 bg-slate-50 px-6 py-4 flex justify-between items-center">
         <h2 className="text-lg font-bold text-slate-800">Identification Result</h2>
-        <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-          Match: {data.confidenceScore}%
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+            Match: {data.confidenceScore}%
+          </span>
+          {feedbackState === 'accepted' && (
+             <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/20">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+                <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
+              </svg>
+              Verified
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="p-6 space-y-6">
@@ -98,6 +145,68 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data }) => {
             </p>
           </div>
         </div>
+
+        {/* Feedback Section - Only show if not yet interacted */}
+        {feedbackState === 'idle' && (
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-slate-600 font-medium">Is this identification correct?</div>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <button 
+                onClick={handleReject}
+                className="flex-1 sm:flex-none px-4 py-2 bg-white text-red-600 border border-red-200 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+                Reject
+              </button>
+              <button 
+                onClick={handleAccept}
+                className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Alternatives Section (triggered on Reject) */}
+        {feedbackState === 'rejected' && (
+          <div className="pt-4 border-t border-slate-100 animate-in fade-in duration-300">
+             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3 block">Alternative Matches (Search Results)</label>
+             
+             {loadingAlternatives && (
+                <div className="flex items-center justify-center py-6 text-slate-500 gap-2">
+                  <div className="w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Searching Department 56 catalog...</span>
+                </div>
+             )}
+
+             <div className="grid gap-3">
+               {alternatives.map((alt, idx) => (
+                 <div key={idx} className="bg-white border border-slate-200 p-4 rounded-lg hover:border-blue-300 transition-colors shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="space-y-1">
+                      <div className="font-semibold text-slate-900">{alt.name}</div>
+                      <div className="text-xs text-blue-600 font-medium">{alt.series}</div>
+                      <div className="text-xs text-slate-500">{alt.reason}</div>
+                    </div>
+                    <button 
+                      onClick={() => handleSelectAlternative(alt)}
+                      className="shrink-0 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-md hover:bg-blue-100 transition-colors"
+                    >
+                      Select Match
+                    </button>
+                 </div>
+               ))}
+               {!loadingAlternatives && alternatives.length === 0 && (
+                 <div className="text-sm text-slate-500 italic text-center py-2">No alternative matches found via search.</div>
+               )}
+             </div>
+          </div>
+        )}
 
         {/* Market Data Section (Dynamic) */}
         {(marketData || loadingMarket || marketError) && (

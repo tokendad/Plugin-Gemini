@@ -10,6 +10,12 @@ export interface D56Item {
   confidenceScore: number;
 }
 
+export interface AlternativeItem {
+  name: string;
+  series: string;
+  reason: string;
+}
+
 export enum AnalysisStatus {
   IDLE = 'IDLE',
   ANALYZING = 'ANALYZING',

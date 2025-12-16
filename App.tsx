@@ -7,6 +7,7 @@ import { identifyItem, fileToGenerativePart } from './services/geminiService';
 
 const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [imageData, setImageData] = useState<{ base64: string; mimeType: string } | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>(AnalysisStatus.IDLE);
   const [result, setResult] = useState<D56Item | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,11 +21,13 @@ const App: React.FC = () => {
     setStatus(AnalysisStatus.ANALYZING);
     setError(null);
     setResult(null);
+    setImageData(null);
 
     try {
       console.log("[App] Processing image selection...");
       // 3. Process image for API
       const base64Data = await fileToGenerativePart(file);
+      setImageData({ base64: base64Data, mimeType: file.type });
       
       // 4. Call Gemini
       console.log("[App] Invoking identifyItem service...");
@@ -48,6 +51,7 @@ const App: React.FC = () => {
     setStatus(AnalysisStatus.IDLE);
     setResult(null);
     setError(null);
+    setImageData(null);
     console.log("[App] Reset state.");
   };
 
@@ -128,7 +132,13 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {result && <ResultCard data={result} />}
+            {result && (
+              <ResultCard 
+                data={result} 
+                imageData={imageData}
+                onUpdateData={setResult}
+              />
+            )}
           </div>
 
         </div>
