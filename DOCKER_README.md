@@ -50,6 +50,12 @@ Because this is a static client-side application (React), environment variables 
 
 3. Access the app at [http://localhost:8080](http://localhost:8080).
 
+## GitHub Actions Workflow (CI/CD)
+
+This repository includes a GitHub Actions workflow for automatically building and pushing Docker images to a container registry.
+
+**See [.github/workflows/README.md](.github/workflows/README.md) for detailed instructions** on using the workflow to push images to Docker Hub or GitHub Container Registry.
+
 ## Development
 
 To run locally without Docker:
