@@ -26,7 +26,7 @@ This plugin implements the [NesVentory Plugin API Specification](https://github.
 ### Prerequisites
 
 - Docker and docker-compose installed
-- Google Gemini API key ([Get one here](https://makersuite.google.com/app/apikey))
+- Google Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
 
 ### Quick Start with Docker
 
@@ -163,7 +163,7 @@ If you see the error "API Key is missing. Please check your environment configur
    ```
    GEMINI_API_KEY=your_actual_api_key_here
    ```
-   ⚠️ **Important**: Replace `your_actual_api_key_here` with your real API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   ⚠️ **Important**: Replace `your_actual_api_key_here` with your real API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
 3. **Build and run** with docker-compose:
    ```bash

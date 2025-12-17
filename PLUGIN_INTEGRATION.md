@@ -9,7 +9,7 @@ The NesVentory Gemini Plugin is a Google Gemini AI-powered backend service that 
 ## Prerequisites
 
 - Docker and docker-compose installed on your system
-- Google Gemini API key ([Get one here](https://makersuite.google.com/app/apikey))
+- Google Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
 - NesVentory v6.0.0 or later installed and running
 
 ## Installation Steps

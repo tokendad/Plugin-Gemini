@@ -32,13 +32,9 @@ RUN npm install
 # Set API_KEY environment variable for Vite build and run build
 # Vite's defineConfig will read API_KEY at build time and bundle it into the frontend
 # Use API_KEY if provided, otherwise use GEMINI_API_KEY
-RUN if [ -n "$API_KEY" ]; then \
-      export BUILD_API_KEY="$API_KEY"; \
-    elif [ -n "$GEMINI_API_KEY" ]; then \
-      export BUILD_API_KEY="$GEMINI_API_KEY"; \
-    else \
-      echo "WARNING: No API key provided during build. Frontend will require API key at runtime."; \
-      export BUILD_API_KEY=""; \
+RUN BUILD_API_KEY="${API_KEY:-$GEMINI_API_KEY}" && \
+    if [ -z "$BUILD_API_KEY" ]; then \
+      echo "WARNING: No API key provided during build. Frontend will not function properly."; \
     fi && \
     API_KEY="$BUILD_API_KEY" npm run build
 
