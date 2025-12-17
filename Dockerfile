@@ -17,11 +17,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY src/ ./src/
 
-# Expose port 8002
+# Expose port 8002 (can be overridden with HOST_PORT or PORT env var)
 EXPOSE 8002
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
 # Run the application
-CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8002"]
+# Use shell form to allow environment variable substitution
+# Prefer HOST_PORT, fall back to PORT, default to 8002
+CMD uvicorn src.api:app --host 0.0.0.0 --port ${HOST_PORT:-${PORT:-8002}}
