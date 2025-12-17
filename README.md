@@ -26,7 +26,7 @@ This plugin implements the [NesVentory Plugin API Specification](https://github.
 ### Prerequisites
 
 - Docker and docker-compose installed
-- Google Gemini API key ([Get one here](https://makersuite.google.com/app/apikey))
+- Google Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
 
 ### Quick Start with Docker
 
@@ -152,7 +152,27 @@ If you see the error "API Key is missing. Please check your environment configur
 1. **Frontend (React/Vite)**: Requires the API key at **build time** (embedded in JavaScript)
 2. **Backend (Python FastAPI)**: Requires the API key at **runtime**
 
-**Solution**: When using Docker, the API key must be passed in **two ways**:
+**Solution**: When using Docker Compose (recommended):
+
+1. **Create a `.env` file** in the project root:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit the `.env` file** and add your actual Gemini API key:
+   ```
+   GEMINI_API_KEY=your_actual_api_key_here
+   ```
+   ⚠️ **Important**: Replace `your_actual_api_key_here` with your real API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+3. **Build and run** with docker-compose:
+   ```bash
+   docker compose up --build
+   ```
+
+The `docker-compose.yml` automatically passes the API key both as a build argument (for frontend) and as a runtime environment variable (for backend).
+
+**Using docker build directly**: If not using docker-compose, the API key must be passed in **two ways**:
 
 1. As a **build argument** (for the frontend):
    ```bash
@@ -163,16 +183,6 @@ If you see the error "API Key is missing. Please check your environment configur
    ```bash
    docker run -e GEMINI_API_KEY=your_key ...
    ```
-
-**Using docker-compose**: The provided `docker-compose.yml` handles this automatically. Just ensure your `.env` file contains:
-```
-GEMINI_API_KEY=your_actual_api_key_here
-```
-
-Then run:
-```bash
-docker compose up --build
-```
 
 **Note**: If you change the API key, you must rebuild the image (not just restart):
 ```bash

@@ -26,11 +26,17 @@ COPY index.html index.tsx App.tsx types.ts ./
 COPY components/ ./components/
 COPY services/ ./services/
 
-# Set API_KEY from GEMINI_API_KEY for frontend build (use GEMINI_API_KEY if API_KEY not provided)
-ENV API_KEY=${API_KEY:-${GEMINI_API_KEY}}
+# Install npm dependencies first
+RUN npm install
 
-# Install and build frontend
-RUN npm install && npm run build
+# Set API_KEY environment variable for Vite build and run build
+# Vite's defineConfig will read API_KEY at build time and bundle it into the frontend
+# Use API_KEY if provided, otherwise use GEMINI_API_KEY
+RUN BUILD_API_KEY="${API_KEY:-$GEMINI_API_KEY}" && \
+    if [ -z "$BUILD_API_KEY" ]; then \
+      echo "WARNING: No API key provided during build. Frontend will not function properly."; \
+    fi && \
+    API_KEY="$BUILD_API_KEY" npm run build
 
 # Copy requirements file
 COPY requirements.txt .
