@@ -17,6 +17,7 @@ export interface AlternativeItem {
   name: string;
   series: string;
   reason: string;
+  confidenceScore?: number;
 }
 
 export enum AnalysisStatus {

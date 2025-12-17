@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { D56Item, AlternativeItem } from '../types';
-import { fetchMarketDetails, MarketDetails, findAlternatives, sendFeedback, addToInventory } from '../services/geminiService';
+import { fetchMarketDetails, MarketDetails, findAlternatives, findAlternativesWithContext, sendFeedback, addToInventory } from '../services/geminiService';
 
 interface ResultCardProps {
   data: D56Item;
@@ -16,6 +16,10 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   // Local state for alternatives only (feedback status is now in data)
   const [alternatives, setAlternatives] = useState<AlternativeItem[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
+  
+  // State for user-provided additional context
+  const [userContext, setUserContext] = useState<string>('');
+  const [showContextInput, setShowContextInput] = useState(false);
 
   // Use props for source of truth, default to idle
   const feedbackState = data.feedbackStatus || 'idle';
@@ -105,11 +109,42 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
       try {
         const alts = await findAlternatives(imageData.base64, imageData.mimeType, data.name);
         setAlternatives(alts);
+        // Show context input if no alternatives found
+        if (alts.length === 0) {
+          setShowContextInput(true);
+        }
       } catch (e) {
         console.error("Failed to find alternatives", e);
+        // Show context input on error as well
+        setShowContextInput(true);
       } finally {
         setLoadingAlternatives(false);
       }
+    }
+  };
+
+  const handleSearchWithContext = async () => {
+    if (!imageData || !userContext.trim()) return;
+    
+    setLoadingAlternatives(true);
+    setShowContextInput(false);
+    try {
+      const alts = await findAlternativesWithContext(
+        imageData.base64, 
+        imageData.mimeType, 
+        data.name,
+        userContext.trim()
+      );
+      setAlternatives(alts);
+      // If still no results, show the input again
+      if (alts.length === 0) {
+        setShowContextInput(true);
+      }
+    } catch (e) {
+      console.error("Failed to find alternatives with context", e);
+      setShowContextInput(true);
+    } finally {
+      setLoadingAlternatives(false);
     }
   };
 
@@ -277,7 +312,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
         {/* Alternatives Section (triggered on Reject) */}
         {feedbackState === 'rejected' && (
           <div className="pt-4 border-t border-slate-100 animate-in fade-in duration-300">
-             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3 block">Alternative Matches (Search Results)</label>
+             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3 block">
+               Alternative Matches {alternatives.length > 0 && `(${alternatives.length} found)`}
+             </label>
              
              {loadingAlternatives && (
                 <div className="flex items-center justify-center py-6 text-slate-500 gap-2">
@@ -289,8 +326,15 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
              <div className="grid gap-3">
                {alternatives.map((alt, idx) => (
                  <div key={idx} className="bg-white border border-slate-200 p-4 rounded-lg hover:border-blue-300 transition-colors shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="space-y-1">
-                      <div className="font-semibold text-slate-900">{alt.name}</div>
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-slate-900">{alt.name}</div>
+                        {alt.confidenceScore && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                            {alt.confidenceScore}%
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-blue-600 font-medium">{alt.series}</div>
                       <div className="text-xs text-slate-500">{alt.reason}</div>
                     </div>
@@ -302,10 +346,61 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
                     </button>
                  </div>
                ))}
-               {!loadingAlternatives && alternatives.length === 0 && (
+               {!loadingAlternatives && alternatives.length === 0 && !showContextInput && (
                  <div className="text-sm text-slate-500 italic text-center py-2">No alternative matches found via search.</div>
                )}
              </div>
+
+             {/* Context Input Section - shown when no alternatives found */}
+             {!loadingAlternatives && showContextInput && (
+               <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                 <div className="flex items-start gap-2">
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0">
+                     <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clipRule="evenodd" />
+                   </svg>
+                   <div className="flex-1">
+                     <h4 className="text-sm font-semibold text-amber-900 mb-1">No matches found</h4>
+                     <p className="text-xs text-amber-700 mb-3">
+                       Help us find the correct item by providing additional details such as:
+                     </p>
+                     <ul className="text-xs text-amber-600 list-disc list-inside space-y-1 mb-3">
+                       <li>Specific features (e.g., "red barn with white trim")</li>
+                       <li>Text visible on the box or piece</li>
+                       <li>Village series (e.g., "Dickens Village", "North Pole")</li>
+                       <li>Approximate year or era</li>
+                     </ul>
+                   </div>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <textarea
+                     value={userContext}
+                     onChange={(e) => setUserContext(e.target.value)}
+                     placeholder="Example: This is a red brick church with a white steeple from the Dickens Village series..."
+                     className="w-full px-3 py-2 text-sm border border-amber-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
+                     rows={3}
+                   />
+                   <div className="flex gap-2">
+                     <button
+                       onClick={handleSearchWithContext}
+                       disabled={!userContext.trim()}
+                       className="flex-1 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                     >
+                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                         <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                       </svg>
+                       Search with Details
+                     </button>
+                     <button
+                       onClick={() => setShowContextInput(false)}
+                       className="px-4 py-2 bg-white text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
+                     >
+                       Cancel
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             )}
           </div>
         )}
 

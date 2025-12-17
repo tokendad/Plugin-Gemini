@@ -46,7 +46,7 @@ The NesVentory Gemini Plugin is a Google Gemini AI-powered backend service that 
 
 5. Verify it's running:
    ```bash
-   curl http://localhost:8000/health
+   curl http://localhost:8002/health
    ```
    
    Expected response:
@@ -63,7 +63,7 @@ The NesVentory Gemini Plugin is a Google Gemini AI-powered backend service that 
 ```bash
 docker run -d \
   --name nesventory-gemini-plugin \
-  -p 8000:8000 \
+  -p 8002:8002 \
   -e GEMINI_API_KEY=your_api_key_here \
   --restart unless-stopped \
   tokendad/plugin-gemini:latest
@@ -86,10 +86,10 @@ docker run -d \
    **Connection Settings:**
    
    If both NesVentory and the plugin are running in Docker on the same network:
-   - **Endpoint URL**: `http://nesventory-gemini-plugin:8000`
+   - **Endpoint URL**: `http://nesventory-gemini-plugin:8002`
    
    If running on different systems or not using Docker networking:
-   - **Endpoint URL**: `http://<plugin-server-ip>:8000`
+   - **Endpoint URL**: `http://<plugin-server-ip>:8002`
    
    Replace `<plugin-server-ip>` with the actual IP address of the server running the plugin.
 
@@ -128,7 +128,7 @@ If both NesVentory and the plugin are running in Docker:
        restart: unless-stopped
    ```
    
-   Use endpoint: `http://gemini-plugin:8000`
+   Use endpoint: `http://gemini-plugin:8002`
 
 2. **Separate docker-compose files** (Connect networks):
    ```bash
@@ -139,7 +139,7 @@ If both NesVentory and the plugin are running in Docker:
    docker network connect <nesventory_network> nesventory-gemini-plugin
    ```
    
-   Use endpoint: `http://nesventory-gemini-plugin:8000`
+   Use endpoint: `http://nesventory-gemini-plugin:8002`
 
 3. **Using host IP** (Always works):
    Find your host machine's IP address:
@@ -151,7 +151,7 @@ If both NesVentory and the plugin are running in Docker:
    ipconfig
    ```
    
-   Use endpoint: `http://192.168.x.x:8000` (replace with your actual IP)
+   Use endpoint: `http://192.168.x.x:8002` (replace with your actual IP)
 
 ## Testing the Integration
 
@@ -159,7 +159,7 @@ If both NesVentory and the plugin are running in Docker:
 
 From your NesVentory server, test the plugin is reachable:
 ```bash
-curl http://nesventory-gemini-plugin:8000/health
+curl http://nesventory-gemini-plugin:8002/health
 ```
 
 Expected response:
@@ -203,7 +203,7 @@ Look for log entries showing successful API calls from NesVentory.
 1. Verify plugin is running: `docker ps | grep gemini-plugin`
 2. Check if you can access health endpoint from NesVentory container:
    ```bash
-   docker exec -it <nesventory-container> curl http://nesventory-gemini-plugin:8000/health
+   docker exec -it <nesventory-container> curl http://nesventory-gemini-plugin:8002/health
    ```
 3. If above fails, use host IP instead of container name
 4. Check firewall rules if using different machines
