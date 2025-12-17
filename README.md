@@ -48,7 +48,12 @@ This plugin implements the [NesVentory Plugin API Specification](https://github.
 
 4. Start the plugin server:
    ```bash
-   docker-compose up -d
+   docker compose up --build
+   ```
+   
+   Or if you have older Docker Compose v1:
+   ```bash
+   docker-compose up --build
    ```
 
 5. The plugin will be available at `http://localhost:8002`
@@ -139,8 +144,43 @@ This plugin uses:
 
 ## Troubleshooting
 
+### "API Key is missing" Error
+
+If you see the error "API Key is missing. Please check your environment configuration":
+
+**Root Cause**: The application has two components that need the API key:
+1. **Frontend (React/Vite)**: Requires the API key at **build time** (embedded in JavaScript)
+2. **Backend (Python FastAPI)**: Requires the API key at **runtime**
+
+**Solution**: When using Docker, the API key must be passed in **two ways**:
+
+1. As a **build argument** (for the frontend):
+   ```bash
+   docker build --build-arg GEMINI_API_KEY=your_key .
+   ```
+
+2. As a **runtime environment variable** (for the backend):
+   ```bash
+   docker run -e GEMINI_API_KEY=your_key ...
+   ```
+
+**Using docker-compose**: The provided `docker-compose.yml` handles this automatically. Just ensure your `.env` file contains:
+```
+GEMINI_API_KEY=your_actual_api_key_here
+```
+
+Then run:
+```bash
+docker compose up --build
+```
+
+**Note**: If you change the API key, you must rebuild the image (not just restart):
+```bash
+docker compose up --build --force-recreate
+```
+
 ### Plugin Not Connecting
-- Ensure the plugin container is running: `docker-compose ps`
+- Ensure the plugin container is running: `docker compose ps`
 - Check Docker networks if running NesVentory in Docker - use container name instead of localhost
 - Verify the endpoint URL in NesVentory matches your plugin's address
 
@@ -151,7 +191,7 @@ This plugin uses:
 ### No Items Detected
 - Ensure images are clear and well-lit
 - Try images that clearly show Department 56 branding or packaging
-- Check logs: `docker-compose logs -f nesventory-gemini-plugin`
+- Check logs: `docker compose logs -f nesventory-gemini-plugin`
 
 ## License
 
