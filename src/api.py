@@ -11,6 +11,7 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -20,7 +21,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import google.generativeai as genai
 from PIL import Image
-from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 # Version
 __version__ = "1.0.0"
+
+# Path to built frontend
+DIST_PATH = Path(__file__).parent.parent / "dist"
 
 
 class HealthResponse(BaseModel):
@@ -130,18 +133,16 @@ app.add_middleware(
 )
 
 # Mount static files if dist directory exists (built frontend)
-dist_path = Path(__file__).parent.parent / "dist"
-if dist_path.exists():
+if DIST_PATH.exists():
     # Mount static assets (JS, CSS, etc.)
-    app.mount("/assets", StaticFiles(directory=str(dist_path / "assets")), name="assets")
+    app.mount("/assets", StaticFiles(directory=str(DIST_PATH / "assets")), name="assets")
 
 
 @app.get("/")
 async def root():
     """Root endpoint - serves frontend UI if available, otherwise returns API info."""
     # Check if frontend is built
-    dist_path = Path(__file__).parent.parent / "dist"
-    index_path = dist_path / "index.html"
+    index_path = DIST_PATH / "index.html"
     
     if index_path.exists():
         # Serve the frontend HTML
@@ -538,13 +539,15 @@ If you cannot identify the barcode, return: {{"found": false}}
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
     """Serve frontend for any non-API routes (client-side routing)."""
+    # List of API route prefixes to exclude from frontend serving
+    api_prefixes = ("health", "nesventory", "parse-data-tag", "lookup-barcode", "docs", "redoc", "openapi.json", "api")
+    
     # Don't catch API routes
-    if full_path.startswith(("health", "nesventory", "parse-data-tag", "lookup-barcode", "docs", "redoc", "openapi.json", "api")):
+    if full_path.startswith(api_prefixes):
         raise HTTPException(status_code=404, detail="Not found")
     
     # Serve the frontend HTML for all other routes
-    dist_path = Path(__file__).parent.parent / "dist"
-    index_path = dist_path / "index.html"
+    index_path = DIST_PATH / "index.html"
     
     if index_path.exists():
         return FileResponse(str(index_path))
