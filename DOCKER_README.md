@@ -52,7 +52,7 @@ This project is containerized using Docker and Nginx, providing an easy way to d
    ```
 
 5. **Access the application**:
-   Open your browser to [http://localhost:8080](http://localhost:8080)
+   Open your browser to [http://localhost:8002](http://localhost:8002)
 
 ## Environment Variables
 
@@ -77,7 +77,15 @@ The application uses several environment variables for configuration. All variab
 **📖 For detailed information about each variable, see [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md)**
 
 **Important Note on Build-Time Variables**:
-Because this is a static client-side application (React/Vite), the `GEMINI_API_KEY` is "baked in" to the JavaScript code at **build time**. It cannot be changed at runtime without rebuilding the image.
+This application has two components that need the API key:
+1. **Frontend (React/Vite)**: The `GEMINI_API_KEY` is "baked in" to the JavaScript code at **build time** and cannot be changed at runtime without rebuilding the image.
+2. **Backend (Python API)**: The `GEMINI_API_KEY` is also used by the Python FastAPI backend at **runtime**.
+
+Therefore, when using Docker, you must:
+- Pass `GEMINI_API_KEY` as a **build argument** (for the frontend)
+- Pass `GEMINI_API_KEY` as a **runtime environment variable** (for the backend)
+
+The provided `docker-compose.yml` file handles this automatically by passing the variable in both contexts.
 
 ## Configuration Options
 
@@ -180,7 +188,8 @@ docker build \
 ```bash
 docker run -d \
   --name nesventory-plugin \
-  -p 8080:80 \
+  -p 8002:8002 \
+  -e GEMINI_API_KEY=your_actual_api_key_here \
   -e TZ=UTC \
   -e PUID=1000 \
   -e PGID=1000 \

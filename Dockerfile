@@ -1,6 +1,10 @@
 # Use Python 3.11 slim image
 FROM python:3.11-slim
 
+# Accept API key as build argument
+ARG GEMINI_API_KEY
+ARG API_KEY
+
 WORKDIR /app
 
 # Install system dependencies including Node.js for building frontend
@@ -21,6 +25,9 @@ COPY tsconfig.json tsconfig.node.json vite.config.ts ./
 COPY index.html index.tsx App.tsx types.ts ./
 COPY components/ ./components/
 COPY services/ ./services/
+
+# Set API_KEY from GEMINI_API_KEY for frontend build (use GEMINI_API_KEY if API_KEY not provided)
+ENV API_KEY=${API_KEY:-${GEMINI_API_KEY}}
 
 # Install and build frontend
 RUN npm install && npm run build

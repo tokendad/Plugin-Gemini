@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  nesventory-gemini-plugin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - GEMINI_API_KEY=${GEMINI_API_KEY}
+    container_name: nesventory-gemini-plugin
+    ports:
+      - "8002:8002"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - .env
+    restart: unless-stopped
