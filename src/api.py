@@ -15,9 +15,12 @@ from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import google.generativeai as genai
 from PIL import Image
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -126,10 +129,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files if dist directory exists (built frontend)
+dist_path = Path(__file__).parent.parent / "dist"
+if dist_path.exists():
+    # Mount static assets (JS, CSS, etc.)
+    app.mount("/assets", StaticFiles(directory=str(dist_path / "assets")), name="assets")
+
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
+    """Root endpoint - serves frontend UI if available, otherwise returns API info."""
+    # Check if frontend is built
+    dist_path = Path(__file__).parent.parent / "dist"
+    index_path = dist_path / "index.html"
+    
+    if index_path.exists():
+        # Serve the frontend HTML
+        return FileResponse(str(index_path))
+    else:
+        # Return API information (fallback for when frontend is not built)
+        return {
+            "message": "NesVentory Gemini Plugin API",
+            "version": __version__,
+            "endpoints": {
+                "health": "/health",
+                "identify_image": "/nesventory/identify/image",
+                "parse_data_tag": "/parse-data-tag",
+                "lookup_barcode": "/lookup-barcode"
+            }
+        }
+
+
+@app.get("/api")
+async def api_info():
+    """API info endpoint - always returns JSON."""
     return {
         "message": "NesVentory Gemini Plugin API",
         "version": __version__,
@@ -499,6 +532,24 @@ If you cannot identify the barcode, return: {{"found": false}}
                 "error_code": "LOOKUP_ERROR",
             },
         )
+
+
+# Catch-all route for frontend client-side routing (must be last)
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """Serve frontend for any non-API routes (client-side routing)."""
+    # Don't catch API routes
+    if full_path.startswith(("health", "nesventory", "parse-data-tag", "lookup-barcode", "docs", "redoc", "openapi.json", "api")):
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # Serve the frontend HTML for all other routes
+    dist_path = Path(__file__).parent.parent / "dist"
+    index_path = dist_path / "index.html"
+    
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not built")
 
 
 if __name__ == "__main__":

@@ -3,10 +3,23 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Node.js for building frontend
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# Copy frontend files
+COPY package.json ./
+COPY tsconfig.json tsconfig.node.json vite.config.ts ./
+COPY index.html index.tsx App.tsx types.ts ./
+COPY components/ ./components/
+COPY services/ ./services/
+
+# Install and build frontend
+RUN npm install && npm run build
 
 # Copy requirements file
 COPY requirements.txt .
