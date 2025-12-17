@@ -83,13 +83,24 @@ This document provides detailed information about all environment variables used
 
 ### HOST_PORT
 
-- **Description**: The port on your host machine that will be mapped to the container's port 80
+- **Description**: The port that the application will listen on inside the container
 - **Required**: No
-- **Default**: `8080`
+- **Default**: `8002`
 - **Format**: Integer (1-65535)
-- **Example**: `HOST_PORT=8080`
-- **Purpose**: Allows you to access the application at `http://localhost:HOST_PORT`
-- **When to change**: If port 8080 is already in use on your host machine, or if you prefer a different port
+- **Example**: `HOST_PORT=8002`
+- **Purpose**: Controls which port the uvicorn server binds to inside the container. When using Docker, you also need to map this port in your docker-compose.yml or docker run command (e.g., `-p 8002:8002`)
+- **When to change**: If port 8002 conflicts with other services, or if you prefer a different port
+- **Note**: This takes precedence over the `PORT` environment variable if both are set
+
+### PORT
+
+- **Description**: Alternative environment variable for specifying the application port
+- **Required**: No
+- **Default**: `8002` (if HOST_PORT is not set)
+- **Format**: Integer (1-65535)
+- **Example**: `PORT=8002`
+- **Purpose**: Alternative to HOST_PORT for controlling which port the uvicorn server binds to
+- **Note**: If both HOST_PORT and PORT are set, HOST_PORT takes precedence
 
 ## Volume Mounts
 
@@ -132,7 +143,7 @@ All these variables can be configured in a `.env` file in the project root direc
    PUID=1000
    PGID=1000
    UMASK=022
-   HOST_PORT=8080
+   HOST_PORT=8002
    ```
 
 4. Save the file
