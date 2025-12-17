@@ -171,16 +171,16 @@ GEMINI_API_KEY=your_actual_api_key_here
 
 Then run:
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 **Note**: If you change the API key, you must rebuild the image (not just restart):
 ```bash
-docker-compose up --build --force-recreate
+docker compose up --build --force-recreate
 ```
 
 ### Plugin Not Connecting
-- Ensure the plugin container is running: `docker-compose ps`
+- Ensure the plugin container is running: `docker compose ps`
 - Check Docker networks if running NesVentory in Docker - use container name instead of localhost
 - Verify the endpoint URL in NesVentory matches your plugin's address
 
@@ -191,7 +191,7 @@ docker-compose up --build --force-recreate
 ### No Items Detected
 - Ensure images are clear and well-lit
 - Try images that clearly show Department 56 branding or packaging
-- Check logs: `docker-compose logs -f nesventory-gemini-plugin`
+- Check logs: `docker compose logs -f nesventory-gemini-plugin`
 
 ## License
 
