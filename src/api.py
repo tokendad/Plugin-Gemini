@@ -505,5 +505,12 @@ if __name__ == "__main__":
     import uvicorn
     # Read port from environment variable, defaulting to 8002
     # Prefer HOST_PORT over PORT for backwards compatibility
-    port = int(os.environ.get("HOST_PORT", os.environ.get("PORT", "8002")))
+    try:
+        port = int(os.environ.get("HOST_PORT", os.environ.get("PORT", "8002")))
+        if port < 1 or port > 65535:
+            raise ValueError(f"Port must be between 1 and 65535, got {port}")
+    except ValueError as e:
+        logger.error(f"Invalid port configuration: {e}")
+        logger.error("Using default port 8002")
+        port = 8002
     uvicorn.run(app, host="0.0.0.0", port=port)
