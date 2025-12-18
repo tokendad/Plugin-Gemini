@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { D56Item, AlternativeItem } from "../types";
+import { getApiKey } from "./configService";
 
 // Helper to convert file to Base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
@@ -98,12 +99,14 @@ const d56Schema: Schema = {
 export const identifyItem = async (base64Data: string, mimeType: string): Promise<D56Item[]> => {
   console.log("[GeminiService] Starting specialized Dept 56 identification (Multi-item)...");
   
-  if (!process.env.API_KEY) {
-    console.error("[GeminiService] CRITICAL: API Key is missing in process.env");
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    console.error("[GeminiService] CRITICAL: API Key is missing");
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     console.log(`[GeminiService] Sending request to model 'gemini-2.5-flash' with mimeType: ${mimeType}`);
@@ -206,11 +209,13 @@ export interface MarketDetails {
 export const fetchMarketDetails = async (itemName: string, series: string): Promise<MarketDetails> => {
   console.log(`[GeminiService] Fetching market details for: ${itemName} (${series})`);
   
-  if (!process.env.API_KEY) {
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
     throw new Error("API Key is missing.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     // Use Google Search grounding to find live data
@@ -250,11 +255,14 @@ export const fetchMarketDetails = async (itemName: string, series: string): Prom
 
 export const findAlternatives = async (base64Data: string, mimeType: string, rejectedName?: string): Promise<AlternativeItem[]> => {
   console.log("[GeminiService] Searching for alternatives...");
-  if (!process.env.API_KEY) {
+  
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
     throw new Error("API Key is missing.");
   }
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const alternativesSchema: Schema = {
@@ -309,11 +317,14 @@ export const findAlternativesWithContext = async (
   userContext: string
 ): Promise<AlternativeItem[]> => {
   console.log("[GeminiService] Searching for alternatives with user context...");
-  if (!process.env.API_KEY) {
+  
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
     throw new Error("API Key is missing.");
   }
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const alternativesSchema: Schema = {

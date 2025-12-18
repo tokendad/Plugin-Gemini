@@ -179,6 +179,14 @@ async def api_info():
     }
 
 
+@app.get("/api/config")
+async def get_config():
+    """Get runtime configuration for the frontend."""
+    return {
+        "apiKey": os.environ.get("GEMINI_API_KEY", ""),
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Check the health status of the plugin."""

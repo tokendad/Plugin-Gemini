@@ -76,16 +76,13 @@ The application uses several environment variables for configuration. All variab
 
 **📖 For detailed information about each variable, see [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md)**
 
-**Important Note on Build-Time Variables**:
-This application has two components that need the API key:
-1. **Frontend (React/Vite)**: The `GEMINI_API_KEY` is "baked in" to the JavaScript code at **build time** and cannot be changed at runtime without rebuilding the image.
-2. **Backend (Python API)**: The `GEMINI_API_KEY` is also used by the Python FastAPI backend at **runtime**.
+**Important Note on Runtime Configuration**:
+The API key is now configured at **runtime** instead of build time. This means:
+1. **No rebuild required**: You can change your API key by simply updating the `.env` file and recreating the container
+2. **Both frontend and backend**: The `GEMINI_API_KEY` is used by both the Python FastAPI backend and served to the React frontend at runtime
+3. **Easy updates**: Simply run `docker-compose down && docker-compose up -d` after changing the API key in your `.env` file (Note: `docker-compose restart` does not reload the `.env` file)
 
-Therefore, when using Docker, you must:
-- Pass `GEMINI_API_KEY` as a **build argument** (for the frontend)
-- Pass `GEMINI_API_KEY` as a **runtime environment variable** (for the backend)
-
-The provided `docker-compose.yml` file handles this automatically by passing the variable in both contexts.
+The provided `docker-compose.yml` file handles this automatically by passing the variable as a runtime environment variable.
 
 ## Configuration Options
 
@@ -161,11 +158,16 @@ docker-compose down
 
 ### Rebuilding after changes
 
-If you change the API key or other build-time variables:
+### Changing the API key
+
+If you change the API key, simply update your `.env` file and recreate the container:
 
 ```bash
-docker-compose up --build --force-recreate
+docker-compose down
+docker-compose up -d
 ```
+
+No rebuild is necessary since the API key is now configured at runtime. Note: `docker-compose restart` does not reload the `.env` file.
 
 ## Running with Docker CLI
 
@@ -174,13 +176,7 @@ If you prefer to use Docker directly without Docker Compose:
 ### Build the image
 
 ```bash
-docker build \
-  --build-arg GEMINI_API_KEY=your_actual_api_key_here \
-  --build-arg TZ=UTC \
-  --build-arg PUID=1000 \
-  --build-arg PGID=1000 \
-  --build-arg UMASK=022 \
-  -t nesventory-d56 .
+docker build -t nesventory-d56 .
 ```
 
 ### Run the container
@@ -199,7 +195,7 @@ docker run -d \
 
 ### Access the application
 
-Open your browser to [http://localhost:8080](http://localhost:8080)
+Open your browser to [http://localhost:8002](http://localhost:8002)
 
 ## Volume Mounts
 
@@ -315,10 +311,13 @@ If port 8080 is already in use:
 If you change the API key:
 
 1. Update `GEMINI_API_KEY` in `.env`
-2. **Must rebuild** (not just restart):
+2. **Recreate the container** to reload environment variables:
    ```bash
-   docker-compose up --build --force-recreate
+   docker-compose down
+   docker-compose up -d
    ```
+
+The API key is now configured at runtime, so no rebuild is necessary. Note: `docker-compose restart` does not reload the `.env` file, so you must use `down` and `up` to apply the new API key.
 
 ### Permission Denied Errors
 
