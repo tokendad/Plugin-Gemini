@@ -173,11 +173,16 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
     // Validate and normalize retirement status
     if (data.items) {
       data.items.forEach(item => {
-        // If yearRetired is provided but retiredStatus is not set or inconsistent, fix it
-        if (item.yearRetired && (!item.retiredStatus || item.retiredStatus !== 'Retired')) {
+        // If yearRetired is provided, ensure retiredStatus is 'Retired'
+        if (item.yearRetired && item.retiredStatus !== 'Retired') {
+          console.log(`[GeminiService] Normalizing retiredStatus to 'Retired' for ${item.name}`);
           item.retiredStatus = 'Retired';
-        } else if (!item.yearRetired && !item.retiredStatus) {
-          item.retiredStatus = 'Active';
+        }
+        // If no yearRetired and no explicit status, default to 'Unknown'
+        // Note: We use 'Unknown' as default because without retirement info,
+        // we cannot reliably determine if an item is still in production
+        else if (!item.yearRetired && !item.retiredStatus) {
+          item.retiredStatus = 'Unknown';
         }
       });
     }

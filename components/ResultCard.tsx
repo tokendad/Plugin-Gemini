@@ -31,10 +31,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
       return item.retiredStatus;
     }
     // Fallback: determine from yearRetired
+    // If yearRetired exists, the item is definitely retired
     if (item.yearRetired) {
       return 'Retired';
     }
-    return 'Active';
+    // Without retirement info, status is unknown
+    return 'Unknown';
   };
 
   // Helper to infer rarity based on dates and item attributes
