@@ -310,12 +310,13 @@ If port 8080 is already in use:
 If you change the API key:
 
 1. Update `GEMINI_API_KEY` in `.env`
-2. **Simply restart** (no rebuild required):
+2. **Recreate the container** to reload environment variables:
    ```bash
-   docker-compose restart
+   docker-compose down
+   docker-compose up -d
    ```
 
-The API key is now configured at runtime, so no rebuild is necessary.
+The API key is now configured at runtime, so no rebuild is necessary. Note: `docker-compose restart` does not reload the `.env` file, so you must use `down` and `up` to apply the new API key.
 
 ### Permission Denied Errors
 

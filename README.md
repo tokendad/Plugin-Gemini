@@ -182,11 +182,12 @@ The `docker-compose.yml` automatically passes the API key as a runtime environme
    docker run -e GEMINI_API_KEY=your_key -p 8002:8002 nesventory-d56
    ```
 
-**Note**: If you change the API key, simply restart the container:
+**Note**: If you change the API key, recreate the container to reload environment variables:
 ```bash
-docker compose restart
+docker compose down
+docker compose up -d
 ```
-No rebuild is necessary since the API key is now configured at runtime.
+No rebuild is necessary since the API key is now configured at runtime. Note: `docker compose restart` does not reload the `.env` file.
 
 ### Plugin Not Connecting
 - Ensure the plugin container is running: `docker compose ps`
