@@ -160,13 +160,14 @@ docker-compose down
 
 ### Changing the API key
 
-If you change the API key, simply update your `.env` file and restart:
+If you change the API key, simply update your `.env` file and recreate the container:
 
 ```bash
-docker-compose restart
+docker-compose down
+docker-compose up -d
 ```
 
-No rebuild is necessary since the API key is now configured at runtime.
+No rebuild is necessary since the API key is now configured at runtime. Note: `docker-compose restart` does not reload the `.env` file.
 
 ## Running with Docker CLI
 

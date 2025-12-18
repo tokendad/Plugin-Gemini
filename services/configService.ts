@@ -2,7 +2,7 @@
 let cachedApiKey: string | null = null;
 
 export const getApiKey = async (): Promise<string> => {
-  // Return cached API key if available
+  // Return cached API key if available (only non-empty keys are cached)
   if (cachedApiKey) {
     return cachedApiKey;
   }
