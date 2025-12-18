@@ -4,7 +4,7 @@ A Google Gemini AI-powered plugin for the NesVentory inventory management system
 
 ## Features
 
-- **Item Identification**: Analyze images to identify Department 56 collectible items with estimated values
+- **Item Identification**: Analyze images to identify Department 56 collectible items with item/model numbers, retirement status, and estimated values
 - **Data Tag Parsing**: Extract manufacturer, model, and serial information from product labels
 - **Barcode Lookup**: Search product information by barcode/UPC
 - **RESTful API**: FastAPI-based server with automatic OpenAPI documentation

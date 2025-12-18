@@ -47,7 +47,7 @@ const d56ItemProperties = {
     },
     retiredStatus: {
       type: Type.STRING,
-      description: "The retirement status: 'Active' if yearRetired is null, 'Retired' if yearRetired is set, or 'Unknown' if status cannot be determined.",
+      description: "The retirement status: 'Retired' if the item is no longer in production, 'Active' if currently in production, or 'Unknown' if status cannot be determined. If yearRetired is provided, this should be 'Retired'.",
       nullable: true,
     },
     estimatedCondition: {
@@ -88,7 +88,7 @@ const d56Schema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: d56ItemProperties,
-        required: ["name", "series", "description", "isDepartment56", "estimatedCondition", "retiredStatus", "isLimitedEdition", "isSigned"],
+        required: ["name", "series", "description", "isDepartment56", "estimatedCondition", "isLimitedEdition", "isSigned"],
       }
     }
   },
@@ -145,7 +145,7 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
             1. **Identify**: List all specific Department 56 pieces found in the image. Use box text if available.
             2. **Item/Model Numbers**: Look for item numbers or SKU codes on the box, bottom of the piece, or any visible labels. Department 56 item numbers often appear as formats like '5544-0' or '56.58302'.
             3. **Series**: Classify each into the correct Village.
-            4. **Retirement Status**: Determine if the item is 'Active', 'Retired', or 'Unknown'. If yearRetired is present, status should be 'Retired'. If no retirement year is found, status should be 'Active' or 'Unknown' based on your knowledge.
+            4. **Retirement Status**: Determine if the item is 'Retired' (no longer in production), 'Active' (still in production), or 'Unknown' (cannot determine). If you provide a yearRetired, the retiredStatus should be 'Retired'.
             5. **Condition Check**: Look closely for chips, missing parts, or box wear for each.
             6. **Rarity Indicators**: Check for "Limited Edition" text, edition numbers, or artist signatures.
             7. **Validation**: Check for the Department 56 logo.

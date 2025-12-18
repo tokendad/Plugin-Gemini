@@ -22,8 +22,11 @@ The body matches the `D56Item` TypeScript interface found in the frontend.
 {
   "name": "Stone Cottage",
   "series": "Dickens' Village Series",
+  "itemNumber": "5544-0",
+  "modelNumber": null,
   "yearIntroduced": 1985,
   "yearRetired": 1991,
+  "retiredStatus": "Retired",
   "estimatedCondition": "Excellent - No Chips",
   "estimatedValueRange": "$45 - $65",
   "description": "A porcelain cottage with snow-covered roof...",
