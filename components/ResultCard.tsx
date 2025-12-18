@@ -229,6 +229,24 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           </div>
         </div>
 
+        {/* Item/Model Numbers */}
+        {(data.itemNumber || data.modelNumber) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {data.itemNumber && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Item Number</label>
+                <div className="text-sm font-mono text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200">{data.itemNumber}</div>
+              </div>
+            )}
+            {data.modelNumber && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Model Number</label>
+                <div className="text-sm font-mono text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200">{data.modelNumber}</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Secondary Info */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-1">
@@ -237,7 +255,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Retired</label>
-            <div className="text-sm font-medium text-slate-900">{data.yearRetired || 'Active'}</div>
+            <div className="text-sm font-medium text-slate-900">
+              {data.retiredStatus || (data.yearRetired ? 'Retired' : 'Active')}
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rarity</label>

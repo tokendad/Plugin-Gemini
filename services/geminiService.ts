@@ -25,6 +25,16 @@ const d56ItemProperties = {
       type: Type.STRING,
       description: "The specific village or sub-series (e.g., 'The Original Snow Village', 'Dickens\' Village Series', 'North Pole Series', 'Christmas in the City', 'Alpine Village', 'Halloween Snow Village').",
     },
+    itemNumber: {
+      type: Type.STRING,
+      description: "The official Department 56 item number or SKU if visible on the box or base (e.g., '5544-0', '56.58302'). Often found on the bottom of the piece or on the box.",
+      nullable: true,
+    },
+    modelNumber: {
+      type: Type.STRING,
+      description: "The model number if different from item number, typically found on product packaging or labels.",
+      nullable: true,
+    },
     yearIntroduced: {
       type: Type.INTEGER,
       description: "The year the item was officially introduced by Department 56.",
@@ -33,6 +43,11 @@ const d56ItemProperties = {
     yearRetired: {
       type: Type.INTEGER,
       description: "The year the item was retired.",
+      nullable: true,
+    },
+    retiredStatus: {
+      type: Type.STRING,
+      description: "The retirement status: 'Active' if yearRetired is null, 'Retired' if yearRetired is set, or 'Unknown' if status cannot be determined.",
       nullable: true,
     },
     estimatedCondition: {
@@ -73,7 +88,7 @@ const d56Schema: Schema = {
       items: {
         type: Type.OBJECT,
         properties: d56ItemProperties,
-        required: ["name", "series", "description", "isDepartment56", "estimatedCondition", "isLimitedEdition", "isSigned"],
+        required: ["name", "series", "description", "isDepartment56", "estimatedCondition", "retiredStatus", "isLimitedEdition", "isSigned"],
       }
     }
   },
@@ -128,10 +143,12 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
             text: `Analyze this image for the inventory.
             
             1. **Identify**: List all specific Department 56 pieces found in the image. Use box text if available.
-            2. **Series**: Classify each into the correct Village.
-            3. **Condition Check**: Look closely for chips, missing parts, or box wear for each.
-            4. **Rarity Indicators**: Check for "Limited Edition" text, edition numbers, or artist signatures.
-            5. **Validation**: Check for the Department 56 logo.
+            2. **Item/Model Numbers**: Look for item numbers or SKU codes on the box, bottom of the piece, or any visible labels. Department 56 item numbers often appear as formats like '5544-0' or '56.58302'.
+            3. **Series**: Classify each into the correct Village.
+            4. **Retirement Status**: Determine if the item is 'Active', 'Retired', or 'Unknown'. If yearRetired is present, status should be 'Retired'. If no retirement year is found, status should be 'Active' or 'Unknown' based on your knowledge.
+            5. **Condition Check**: Look closely for chips, missing parts, or box wear for each.
+            6. **Rarity Indicators**: Check for "Limited Edition" text, edition numbers, or artist signatures.
+            7. **Validation**: Check for the Department 56 logo.
             
             Return the data matching the JSON schema, with a list of items.`
           }
