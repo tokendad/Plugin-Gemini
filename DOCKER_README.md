@@ -78,9 +78,9 @@ The application uses several environment variables for configuration. All variab
 
 **Important Note on Runtime Configuration**:
 The API key is now configured at **runtime** instead of build time. This means:
-1. **No rebuild required**: You can change your API key by simply updating the `.env` file and restarting the container
+1. **No rebuild required**: You can change your API key by simply updating the `.env` file and recreating the container
 2. **Both frontend and backend**: The `GEMINI_API_KEY` is used by both the Python FastAPI backend and served to the React frontend at runtime
-3. **Easy updates**: Simply run `docker-compose restart` after changing the API key in your `.env` file
+3. **Easy updates**: Simply run `docker-compose down && docker-compose up -d` after changing the API key in your `.env` file (Note: `docker-compose restart` does not reload the `.env` file)
 
 The provided `docker-compose.yml` file handles this automatically by passing the variable as a runtime environment variable.
 

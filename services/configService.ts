@@ -3,7 +3,7 @@ let cachedApiKey: string | null = null;
 
 export const getApiKey = async (): Promise<string> => {
   // Return cached API key if available
-  if (cachedApiKey !== null) {
+  if (cachedApiKey) {
     return cachedApiKey;
   }
 
@@ -15,12 +15,14 @@ export const getApiKey = async (): Promise<string> => {
     }
     
     const config = await response.json();
-    cachedApiKey = config.apiKey || '';
+    const apiKey = config.apiKey || '';
     
-    if (!cachedApiKey) {
+    if (!apiKey) {
       throw new Error('API key not configured on server');
     }
     
+    // Only cache non-empty API keys
+    cachedApiKey = apiKey;
     return cachedApiKey;
   } catch (error) {
     console.error('[ConfigService] Failed to fetch API key:', error);
