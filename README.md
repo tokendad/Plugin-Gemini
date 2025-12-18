@@ -148,9 +148,7 @@ This plugin uses:
 
 If you see the error "API Key is missing. Please check your environment configuration":
 
-**Root Cause**: The application has two components that need the API key:
-1. **Frontend (React/Vite)**: Requires the API key at **build time** (embedded in JavaScript)
-2. **Backend (Python FastAPI)**: Requires the API key at **runtime**
+**Root Cause**: The application requires the API key to communicate with Google's Gemini AI service.
 
 **Solution**: When using Docker Compose (recommended):
 
@@ -170,24 +168,25 @@ If you see the error "API Key is missing. Please check your environment configur
    docker compose up --build
    ```
 
-The `docker-compose.yml` automatically passes the API key both as a build argument (for frontend) and as a runtime environment variable (for backend).
+The `docker-compose.yml` automatically passes the API key as a runtime environment variable to the container.
 
-**Using docker build directly**: If not using docker-compose, the API key must be passed in **two ways**:
+**Using docker build directly**: If not using docker-compose:
 
-1. As a **build argument** (for the frontend):
+1. Build the image (no API key needed at build time):
    ```bash
-   docker build --build-arg GEMINI_API_KEY=your_key .
+   docker build -t nesventory-d56 .
    ```
 
-2. As a **runtime environment variable** (for the backend):
+2. Run with the API key as a runtime environment variable:
    ```bash
-   docker run -e GEMINI_API_KEY=your_key ...
+   docker run -e GEMINI_API_KEY=your_key -p 8002:8002 nesventory-d56
    ```
 
-**Note**: If you change the API key, you must rebuild the image (not just restart):
+**Note**: If you change the API key, simply restart the container:
 ```bash
-docker compose up --build --force-recreate
+docker compose restart
 ```
+No rebuild is necessary since the API key is now configured at runtime.
 
 ### Plugin Not Connecting
 - Ensure the plugin container is running: `docker compose ps`
