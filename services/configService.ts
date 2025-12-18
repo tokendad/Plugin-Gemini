@@ -1,5 +1,5 @@
 // Configuration service to fetch runtime configuration from backend
-let cachedApiKey: string | null = null;
+let cachedApiKey: string = '';
 
 export const getApiKey = async (): Promise<string> => {
   // Return cached API key if available (only non-empty keys are cached)
