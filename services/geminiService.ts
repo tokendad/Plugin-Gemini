@@ -169,6 +169,19 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
 
     const data = JSON.parse(response.text) as { items: D56Item[] };
     console.log(`[GeminiService] Parsed ${data.items?.length || 0} items.`);
+    
+    // Validate and normalize retirement status
+    if (data.items) {
+      data.items.forEach(item => {
+        // If yearRetired is provided but retiredStatus is not set or inconsistent, fix it
+        if (item.yearRetired && (!item.retiredStatus || item.retiredStatus !== 'Retired')) {
+          item.retiredStatus = 'Retired';
+        } else if (!item.yearRetired && !item.retiredStatus) {
+          item.retiredStatus = 'Active';
+        }
+      });
+    }
+    
     return data.items || [];
 
   } catch (error) {

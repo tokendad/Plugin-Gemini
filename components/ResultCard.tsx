@@ -24,6 +24,19 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   // Use props for source of truth, default to idle
   const feedbackState = data.feedbackStatus || 'idle';
 
+  // Helper to determine retirement status with consistent logic
+  const getRetiredStatus = (item: D56Item): string => {
+    // Use provided status if available
+    if (item.retiredStatus) {
+      return item.retiredStatus;
+    }
+    // Fallback: determine from yearRetired
+    if (item.yearRetired) {
+      return 'Retired';
+    }
+    return 'Active';
+  };
+
   // Helper to infer rarity based on dates and item attributes
   const inferRarity = (item: D56Item): string => {
     const { yearIntroduced: intro, yearRetired: retired, isLimitedEdition, isSigned } = item;
@@ -256,7 +269,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Retired</label>
             <div className="text-sm font-medium text-slate-900">
-              {data.retiredStatus || (data.yearRetired ? 'Retired' : 'Active')}
+              {getRetiredStatus(data)}
             </div>
           </div>
           <div className="space-y-1">
