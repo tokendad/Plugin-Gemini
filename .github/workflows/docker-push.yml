@@ -4,10 +4,6 @@ name: Docker Push
 on:
   workflow_dispatch:
     inputs: 
-      api_key:
-        description: 'Gemini API Key (will be baked into the image)'
-        required: true
-        type: string
       tag: 
         description: 'Docker image tag (e.g., latest, v1.0.0)'
         required: true
