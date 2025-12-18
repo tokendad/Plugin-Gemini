@@ -1,8 +1,11 @@
 export interface D56Item {
   name: string;
   series: string;
+  itemNumber: string | null;
+  modelNumber: string | null;
   yearIntroduced: number | null;
   yearRetired: number | null;
+  retiredStatus: string | null;
   estimatedCondition: string;
   estimatedValueRange: string;
   description: string;

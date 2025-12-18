@@ -24,6 +24,21 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   // Use props for source of truth, default to idle
   const feedbackState = data.feedbackStatus || 'idle';
 
+  // Helper to determine retirement status with consistent logic
+  const getRetiredStatus = (item: D56Item): string => {
+    // Use provided status if available
+    if (item.retiredStatus) {
+      return item.retiredStatus;
+    }
+    // Fallback: determine from yearRetired
+    // If yearRetired exists, the item is definitely retired
+    if (item.yearRetired) {
+      return 'Retired';
+    }
+    // Without retirement info, status is unknown
+    return 'Unknown';
+  };
+
   // Helper to infer rarity based on dates and item attributes
   const inferRarity = (item: D56Item): string => {
     const { yearIntroduced: intro, yearRetired: retired, isLimitedEdition, isSigned } = item;
@@ -229,6 +244,24 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           </div>
         </div>
 
+        {/* Item/Model Numbers */}
+        {(data.itemNumber || data.modelNumber) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {data.itemNumber && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Item Number</label>
+                <div className="text-sm font-mono text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200">{data.itemNumber}</div>
+              </div>
+            )}
+            {data.modelNumber && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Model Number</label>
+                <div className="text-sm font-mono text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200">{data.modelNumber}</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Secondary Info */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-1">
@@ -237,7 +270,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Retired</label>
-            <div className="text-sm font-medium text-slate-900">{data.yearRetired || 'Active'}</div>
+            <div className="text-sm font-medium text-slate-900">
+              {getRetiredStatus(data)}
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rarity</label>

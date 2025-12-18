@@ -45,6 +45,9 @@ class DetectedItem(BaseModel):
     name: str = Field(..., description="Clear, specific name for the item")
     description: Optional[str] = Field(None, description="Brief description including color, size, or notable features")
     brand: Optional[str] = Field(None, description="The brand/manufacturer if identifiable")
+    item_number: Optional[str] = Field(None, description="Official Department 56 item number or SKU")
+    model_number: Optional[str] = Field(None, description="Model number if different from item number")
+    retired_status: Optional[str] = Field(None, description="Retirement status: 'Active', 'Retired', or 'Unknown'")
     estimated_value: Optional[float] = Field(None, description="Approximate value in USD")
     confidence: Optional[float] = Field(None, description="Confidence in identification (0.0 to 1.0)")
     estimation_date: Optional[str] = Field(None, description="Date when value was estimated (MM/DD/YY format)")
@@ -263,8 +266,11 @@ For EACH item you identify, provide:
 1. Specific name (use box text if visible)
 2. Brief physical description (color, architectural style, notable features)
 3. Brand confirmation (must be "Department 56" or note if different)
-4. Estimated market value in USD based on condition
-5. Your confidence level (0.0 to 1.0)
+4. Item number or SKU if visible on box, base, or labels (often formats like '5544-0' or '56.58302')
+5. Model number if different from item number
+6. Retirement status: 'Retired' if you know the item is retired, 'Active' if still in production, or 'Unknown'
+7. Estimated market value in USD based on condition
+8. Your confidence level (0.0 to 1.0)
 
 Return ONLY valid JSON in this exact format (no markdown, no code blocks):
 {
@@ -273,6 +279,9 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
       "name": "specific item name",
       "description": "brief physical description",
       "brand": "Department 56",
+      "item_number": "5544-0",
+      "model_number": null,
+      "retired_status": "Retired",
       "estimated_value": 45.00,
       "confidence": 0.92,
       "estimation_date": "12/16/24"
@@ -307,6 +316,9 @@ If you don't see any Department 56 items, return: {"items": []}
                         name=item.get("name", "Unknown Item"),
                         description=item.get("description"),
                         brand=item.get("brand"),
+                        item_number=item.get("item_number"),
+                        model_number=item.get("model_number"),
+                        retired_status=item.get("retired_status"),
                         estimated_value=item.get("estimated_value"),
                         confidence=item.get("confidence"),
                         estimation_date=item.get("estimation_date")
