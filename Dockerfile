@@ -1,10 +1,6 @@
 # Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Accept API key as build argument
-ARG GEMINI_API_KEY
-ARG API_KEY
-
 WORKDIR /app
 
 # Install system dependencies including Node.js for building frontend
@@ -29,14 +25,8 @@ COPY services/ ./services/
 # Install npm dependencies first
 RUN npm install
 
-# Set API_KEY environment variable for Vite build and run build
-# Vite's defineConfig will read API_KEY at build time and bundle it into the frontend
-# Use API_KEY if provided, otherwise use GEMINI_API_KEY
-RUN BUILD_API_KEY="${API_KEY:-$GEMINI_API_KEY}" && \
-    if [ -z "$BUILD_API_KEY" ]; then \
-      echo "WARNING: No API key provided during build. Frontend will not function properly."; \
-    fi && \
-    API_KEY="$BUILD_API_KEY" npm run build
+# Build the frontend (API key will be fetched from backend at runtime)
+RUN npm run build
 
 # Copy requirements file
 COPY requirements.txt .

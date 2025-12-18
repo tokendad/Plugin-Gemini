@@ -7,8 +7,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - GEMINI_API_KEY=${GEMINI_API_KEY}
     container_name: nesventory-gemini-plugin
     ports:
       - "8002:8002"
