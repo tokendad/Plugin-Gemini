@@ -32,5 +32,5 @@ export const getApiKey = async (): Promise<string> => {
 
 // Clear cached API key (useful for testing or if key changes)
 export const clearApiKeyCache = (): void => {
-  cachedApiKey = null;
+  cachedApiKey = '';
 };
