@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { D56Item, AlternativeItem } from "../types";
+import { getApiKey } from "./configService";
 
 // Helper to convert file to Base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
@@ -16,9 +17,7 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
   });
 };
 
-const d56Schema: Schema = {
-  type: Type.OBJECT,
-  properties: {
+const d56ItemProperties = {
     name: {
       type: Type.STRING,
       description: "The specific name of the Department 56 item (e.g., 'Stone Cottage', 'Main Street Station', 'Santa\'s Workshop').",
@@ -26,6 +25,16 @@ const d56Schema: Schema = {
     series: {
       type: Type.STRING,
       description: "The specific village or sub-series (e.g., 'The Original Snow Village', 'Dickens\' Village Series', 'North Pole Series', 'Christmas in the City', 'Alpine Village', 'Halloween Snow Village').",
+    },
+    itemNumber: {
+      type: Type.STRING,
+      description: "The official Department 56 item number or SKU if visible on the box or base (e.g., '5544-0', '56.58302'). Often found on the bottom of the piece or on the box.",
+      nullable: true,
+    },
+    modelNumber: {
+      type: Type.STRING,
+      description: "The model number if different from item number, typically found on product packaging or labels.",
+      nullable: true,
     },
     yearIntroduced: {
       type: Type.INTEGER,
@@ -35,6 +44,11 @@ const d56Schema: Schema = {
     yearRetired: {
       type: Type.INTEGER,
       description: "The year the item was retired.",
+      nullable: true,
+    },
+    retiredStatus: {
+      type: Type.STRING,
+      description: "The retirement status: 'Retired' if the item is no longer in production, 'Active' if currently in production, or 'Unknown' if status cannot be determined. If yearRetired is provided, this should be 'Retired'.",
       nullable: true,
     },
     estimatedCondition: {
@@ -57,19 +71,42 @@ const d56Schema: Schema = {
       type: Type.NUMBER,
       description: "Confidence score between 0 and 100.",
     },
-  },
-  required: ["name", "series", "description", "isDepartment56", "estimatedCondition"],
+    isLimitedEdition: {
+      type: Type.BOOLEAN,
+      description: "True if the item is explicitly marked as 'Limited Edition', 'Special Edition', has a visible edition number (e.g. 1234/5000), or is a known limited run type.",
+    },
+    isSigned: {
+      type: Type.BOOLEAN,
+      description: "True if a hand-written signature (e.g. by artist Neely Boldt) is visible on the piece or box.",
+    },
 };
 
-export const identifyItem = async (base64Data: string, mimeType: string): Promise<D56Item> => {
-  console.log("[GeminiService] Starting specialized Dept 56 identification...");
+const d56Schema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    items: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: d56ItemProperties,
+        required: ["name", "series", "description", "isDepartment56", "estimatedCondition", "isLimitedEdition", "isSigned"],
+      }
+    }
+  },
+  required: ["items"],
+};
+
+export const identifyItem = async (base64Data: string, mimeType: string): Promise<D56Item[]> => {
+  console.log("[GeminiService] Starting specialized Dept 56 identification (Multi-item)...");
   
-  if (!process.env.API_KEY) {
-    console.error("[GeminiService] CRITICAL: API Key is missing in process.env");
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    console.error("[GeminiService] CRITICAL: API Key is missing");
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     console.log(`[GeminiService] Sending request to model 'gemini-2.5-flash' with mimeType: ${mimeType}`);
@@ -89,8 +126,10 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
       3. **Specialty Series**: Halloween, Disney, Grinch, Harry Potter.
 
       YOUR GOAL:
-      Identify the item with high precision. Differentiate authentic Dept 56 from competitors like Lemax or St. Nicholas Square. 
-      If it is NOT Department 56, flag it immediately.
+      Analyze the image and identify **ALL** distinct Department 56 items visible. 
+      The image may contain a group of items (e.g. a house and accessories). Separate them into individual entries.
+      Differentiate authentic Dept 56 from competitors like Lemax. 
+      If an item is NOT Department 56, flag it immediately.
     `;
 
     const response = await ai.models.generateContent({
@@ -106,15 +145,15 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
           {
             text: `Analyze this image for the inventory.
             
-            1. **Identify**: What specific Department 56 piece is this? Use box text if available.
-            2. **Series**: Classify it into the correct Village (e.g., Snow Village vs Heritage Village).
-            3. **Condition Check**: Look closely for:
-               - Chipped "snow" on roofs or bases.
-               - Missing delicate parts (flags, birds, weathervanes).
-               - Box condition (water damage, tears).
-            4. **Validation**: Check for the Department 56 logo/bottom stamp.
+            1. **Identify**: List all specific Department 56 pieces found in the image. Use box text if available.
+            2. **Item/Model Numbers**: Look for item numbers or SKU codes on the box, bottom of the piece, or any visible labels. Department 56 item numbers often appear as formats like '5544-0' or '56.58302'.
+            3. **Series**: Classify each into the correct Village.
+            4. **Retirement Status**: Determine if the item is 'Retired' (no longer in production), 'Active' (still in production), or 'Unknown' (cannot determine). If you provide a yearRetired, the retiredStatus should be 'Retired'.
+            5. **Condition Check**: Look closely for chips, missing parts, or box wear for each.
+            6. **Rarity Indicators**: Check for "Limited Edition" text, edition numbers, or artist signatures.
+            7. **Validation**: Check for the Department 56 logo.
             
-            Return the data matching the JSON schema.`
+            Return the data matching the JSON schema, with a list of items.`
           }
         ],
       },
@@ -131,9 +170,27 @@ export const identifyItem = async (base64Data: string, mimeType: string): Promis
       throw new Error("No response text received from Gemini.");
     }
 
-    const data = JSON.parse(response.text) as D56Item;
-    console.log("[GeminiService] Data parsed successfully:", data.name);
-    return data;
+    const data = JSON.parse(response.text) as { items: D56Item[] };
+    console.log(`[GeminiService] Parsed ${data.items?.length || 0} items.`);
+    
+    // Validate and normalize retirement status
+    if (data.items) {
+      data.items.forEach(item => {
+        // If yearRetired is provided, ensure retiredStatus is 'Retired'
+        if (item.yearRetired && item.retiredStatus !== 'Retired') {
+          console.log(`[GeminiService] Normalizing retiredStatus to 'Retired' for ${item.name}`);
+          item.retiredStatus = 'Retired';
+        }
+        // If no yearRetired and no explicit status, default to 'Unknown'
+        // Note: We use 'Unknown' as default because without retirement info,
+        // we cannot reliably determine if an item is still in production
+        else if (!item.yearRetired && !item.retiredStatus) {
+          item.retiredStatus = 'Unknown';
+        }
+      });
+    }
+    
+    return data.items || [];
 
   } catch (error) {
     console.error("[GeminiService] API Error Details:", error);
@@ -152,11 +209,13 @@ export interface MarketDetails {
 export const fetchMarketDetails = async (itemName: string, series: string): Promise<MarketDetails> => {
   console.log(`[GeminiService] Fetching market details for: ${itemName} (${series})`);
   
-  if (!process.env.API_KEY) {
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
     throw new Error("API Key is missing.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     // Use Google Search grounding to find live data
@@ -194,13 +253,16 @@ export const fetchMarketDetails = async (itemName: string, series: string): Prom
   }
 };
 
-export const findAlternatives = async (base64Data: string, mimeType: string): Promise<AlternativeItem[]> => {
+export const findAlternatives = async (base64Data: string, mimeType: string, rejectedName?: string): Promise<AlternativeItem[]> => {
   console.log("[GeminiService] Searching for alternatives...");
-  if (!process.env.API_KEY) {
+  
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
     throw new Error("API Key is missing.");
   }
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const alternativesSchema: Schema = {
@@ -210,18 +272,23 @@ export const findAlternatives = async (base64Data: string, mimeType: string): Pr
         properties: {
           name: { type: Type.STRING },
           series: { type: Type.STRING },
-          reason: { type: Type.STRING, description: "Why this might be the correct item based on visual similarity." }
+          reason: { type: Type.STRING, description: "Why this might be the correct item based on visual similarity." },
+          confidenceScore: { type: Type.NUMBER, description: "Confidence score between 0 and 100." }
         },
         required: ["name", "series", "reason"]
       }
     };
+
+    const promptText = rejectedName 
+      ? `The user rejected the identification "${rejectedName}" for an item in this image. Search specifically for the correct Department 56 item visible. List up to 5 possible matches, ordered from most to least likely. Include lower confidence matches that might still be correct.`
+      : "The previous identification of this Department 56 item was rejected by the user. Search specifically for this item's visual match on the web. List up to 5 possible Department 56 items it could be, ordered from most to least likely. Include lower confidence matches.";
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
-          { text: "The previous identification of this Department 56 item was rejected by the user. Search specifically for this item's visual match on the web. List the top 3 most likely correct Department 56 items it could be. Focus on finding the exact model name." }
+          { text: promptText }
         ]
       },
       config: {
@@ -243,17 +310,111 @@ export const findAlternatives = async (base64Data: string, mimeType: string): Pr
   }
 };
 
+export const findAlternativesWithContext = async (
+  base64Data: string, 
+  mimeType: string, 
+  rejectedName: string,
+  userContext: string
+): Promise<AlternativeItem[]> => {
+  console.log("[GeminiService] Searching for alternatives with user context...");
+  
+  // Fetch API key from backend at runtime
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    throw new Error("API Key is missing.");
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+    const alternativesSchema: Schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          series: { type: Type.STRING },
+          reason: { type: Type.STRING, description: "Why this might be the correct item based on visual similarity and user context." },
+          confidenceScore: { type: Type.NUMBER, description: "Confidence score between 0 and 100." }
+        },
+        required: ["name", "series", "reason"]
+      }
+    };
+
+    const promptText = `The user rejected the identification "${rejectedName}" for an item in this image.
+    
+Additional context provided by the user: "${userContext}"
+
+Using this context, search specifically for the correct Department 56 item. Consider:
+1. The visual features in the image
+2. The user's additional details (${userContext})
+3. Department 56 catalog history
+
+List up to 5 possible matches that align with both the image and the user's context, ordered from most to least likely.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: {
+        parts: [
+          { inlineData: { mimeType, data: base64Data } },
+          { text: promptText }
+        ]
+      },
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: alternativesSchema
+      }
+    });
+
+    if (!response.text) {
+      throw new Error("No alternatives found.");
+    }
+    
+    return JSON.parse(response.text) as AlternativeItem[];
+
+  } catch (error) {
+    console.error("[GeminiService] Find Alternatives With Context Error:", error);
+    throw error;
+  }
+};
+
+// --- API Endpoint Simulations ---
+
+// 1. Add to Inventory Endpoint
+export const addToInventory = async (item: D56Item): Promise<boolean> => {
+  console.log(`[GeminiService] Adding item to inventory: ${item.name}`);
+  const INVENTORY_ENDPOINT = 'https://api.nesventory.com/v1/inventory/items';
+  
+  try {
+     const response = await fetch(INVENTORY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item)
+     });
+     
+     if (!response.ok) {
+       console.warn(`[GeminiService] Inventory API returned status: ${response.status}`);
+       // In a real app, you might throw here, but for this demo we'll proceed
+     }
+     return true;
+  } catch (e) {
+     console.log("[GeminiService] Inventory API simulated success (No backend running).");
+     // Simulate network latency
+     await new Promise(r => setTimeout(r, 500));
+     return true;
+  }
+};
+
+// 2. Training/Feedback Endpoint
 export const sendFeedback = async (item: D56Item, imageData?: { base64: string; mimeType: string } | null): Promise<void> => {
   console.log(`[GeminiService] Sending training feedback for item: ${item.name}`);
   
-  // This endpoint represents your backend service that collects training data
   const TRAINING_ENDPOINT = 'https://api.nesventory.com/v1/training/submit';
 
   try {
-    // Construct the training payload
     const payload = {
       itemData: item,
-      // In a real scenario, you might send the full image or a reference ID
       imageMeta: imageData ? { 
         mimeType: imageData.mimeType, 
         size: imageData.base64.length 
@@ -265,9 +426,6 @@ export const sendFeedback = async (item: D56Item, imageData?: { base64: string; 
 
     console.log("[GeminiService] Posting to:", TRAINING_ENDPOINT);
     
-    // Attempt the fetch
-    // Note: Since this is a demo environment, this fetch might fail (404/Network Error). 
-    // We catch it to prevent UI disruption.
     try {
         const response = await fetch(TRAINING_ENDPOINT, {
           method: 'POST',
@@ -279,11 +437,9 @@ export const sendFeedback = async (item: D56Item, imageData?: { base64: string; 
             console.warn(`[GeminiService] Endpoint returned status: ${response.status}`);
         }
     } catch (networkError) {
-        // Expected in demo/local environment without running backend
         console.log("[GeminiService] Network request simulated (No backend running). Data ready for training.");
     }
     
-    // Artificial delay to simulate processing
     await new Promise(resolve => setTimeout(resolve, 600));
 
   } catch (error) {
