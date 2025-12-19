@@ -1,7 +1,6 @@
 {
-  "name": "Copy of NesVentory Dept 56 Recognizer",
-  "description": "An AI-powered inventory assistant specifically trained to identify Department 56 village collectibles using computer vision for the NesVentory system.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "NesVentory Gemini Plugin",
+  "description": "Google Gemini AI-powered plugin for identifying Department 56 village collectibles and parsing product data tags for the NesVentory system.",
+  "version": "1.0.0",
+  "supports_image_processing": true
 }

@@ -1,0 +1,14 @@
+node_modules
+.git
+.github
+*.log
+.env
+.env.*
+!.env.example
+dist
+*.d.ts
+.vscode
+.idea
+README.md
+*.md
+!DOCKER_README.md
