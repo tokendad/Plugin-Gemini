@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { D56Item, AlternativeItem } from '../types';
-import { fetchMarketDetails, MarketDetails, findAlternatives, sendFeedback } from '../services/geminiService';
+import { fetchMarketDetails, MarketDetails, findAlternatives, findAlternativesWithContext, sendFeedback, addToInventory } from '../services/geminiService';
 
 interface ResultCardProps {
   data: D56Item;
@@ -13,27 +13,76 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   const [loadingMarket, setLoadingMarket] = useState(false);
   const [marketError, setMarketError] = useState<string | null>(null);
   
-  const [feedbackState, setFeedbackState] = useState<'idle' | 'accepted' | 'rejected'>('idle');
+  // Local state for alternatives only (feedback status is now in data)
   const [alternatives, setAlternatives] = useState<AlternativeItem[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
+  
+  // State for user-provided additional context
+  const [userContext, setUserContext] = useState<string>('');
+  const [showContextInput, setShowContextInput] = useState(false);
 
-  // Helper to infer rarity based on dates
-  const inferRarity = (intro: number | null, retired: number | null): string => {
+  // Use props for source of truth, default to idle
+  const feedbackState = data.feedbackStatus || 'idle';
+
+  // Helper to determine retirement status with consistent logic
+  const getRetiredStatus = (item: D56Item): string => {
+    // Use provided status if available
+    if (item.retiredStatus) {
+      return item.retiredStatus;
+    }
+    // Fallback: determine from yearRetired
+    // If yearRetired exists, the item is definitely retired
+    if (item.yearRetired) {
+      return 'Retired';
+    }
+    // Without retirement info, status is unknown
+    return 'Unknown';
+  };
+
+  // Helper to infer rarity based on dates and item attributes
+  const inferRarity = (item: D56Item): string => {
+    const { yearIntroduced: intro, yearRetired: retired, isLimitedEdition, isSigned } = item;
+
+    // 1. Explicit Rarity Markers (Highest Priority)
+    if (isSigned) return "Artist Signed (High Value)";
+    if (isLimitedEdition) return "Limited Edition";
+
+    // 2. Production Run Analysis
     if (!retired) return "Common (Active)";
-    // If we don't know when it was introduced, but it is retired, we assume standard unless very old
-    if (!intro && retired) return retired < 2000 ? "Vintage" : "Standard";
-    if (!intro) return "Unknown";
+    
+    // Handle unknown intro date
+    if (!intro) {
+       return retired < 2000 ? "Vintage (Date Unknown)" : "Standard (Retired)";
+    }
     
     const yearsActive = retired - intro;
-    
+
+    // 3. Short Run & Vintage Logic
+    if (yearsActive <= 1) return "Very High (1 Year Run)";
     if (yearsActive <= 2) return "High (Short Run)";
+    
     if (retired < 1990) return "Very Vintage";
     if (retired < 2005) return "Vintage";
     if (yearsActive > 15) return "Common (Long Run)";
+    
     return "Standard (Retired)";
   };
 
-  const rarityLabel = inferRarity(data.yearIntroduced, data.yearRetired);
+  const rarityLabel = inferRarity(data);
+
+  // Validation Logic
+  const currentYear = new Date().getFullYear();
+  const MIN_YEAR = 1976; // Dept 56 founded
+  const MAX_YEAR = currentYear + 1;
+  let yearWarning: string | null = null;
+
+  if (data.yearIntroduced && (data.yearIntroduced < MIN_YEAR || data.yearIntroduced > MAX_YEAR)) {
+    yearWarning = `Introduced Year (${data.yearIntroduced}) is outside valid range (${MIN_YEAR}-${MAX_YEAR}).`;
+  } else if (data.yearRetired && (data.yearRetired < MIN_YEAR || data.yearRetired > MAX_YEAR)) {
+    yearWarning = `Retired Year (${data.yearRetired}) is outside valid range (${MIN_YEAR}-${MAX_YEAR}).`;
+  } else if (data.yearIntroduced && data.yearRetired && data.yearIntroduced > data.yearRetired) {
+    yearWarning = `Invalid Timeline: Introduced (${data.yearIntroduced}) cannot be after Retired (${data.yearRetired}).`;
+  }
 
   const handleCopyJSON = () => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -57,40 +106,79 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
   };
 
   const handleAccept = async () => {
-    setFeedbackState('accepted');
-    console.log(`[ResultCard] User accepted: ${data.name}. Submitting to training endpoint...`);
-    // Send valid data to backend for training
+    console.log(`[ResultCard] User accepted: ${data.name}. Adding to inventory and submitting feedback...`);
+    // 1. Add to Inventory
+    await addToInventory(data);
+    // 2. Send Feedback
     await sendFeedback(data, imageData);
+    
+    onUpdateData({ ...data, feedbackStatus: 'accepted' });
   };
 
   const handleReject = async () => {
-    setFeedbackState('rejected');
     console.log(`[ResultCard] User rejected: ${data.name}. Fetching alternatives...`);
+    onUpdateData({ ...data, feedbackStatus: 'rejected' });
     
     if (imageData) {
       setLoadingAlternatives(true);
       try {
-        const alts = await findAlternatives(imageData.base64, imageData.mimeType);
+        const alts = await findAlternatives(imageData.base64, imageData.mimeType, data.name);
         setAlternatives(alts);
+        // Show context input if no alternatives found
+        if (alts.length === 0) {
+          setShowContextInput(true);
+        }
       } catch (e) {
         console.error("Failed to find alternatives", e);
+        // Show context input on error as well
+        setShowContextInput(true);
       } finally {
         setLoadingAlternatives(false);
       }
     }
   };
 
+  const handleSearchWithContext = async () => {
+    if (!imageData || !userContext.trim()) return;
+    
+    setLoadingAlternatives(true);
+    setShowContextInput(false);
+    try {
+      const alts = await findAlternativesWithContext(
+        imageData.base64, 
+        imageData.mimeType, 
+        data.name,
+        userContext.trim()
+      );
+      setAlternatives(alts);
+      // If still no results, show the input again
+      if (alts.length === 0) {
+        setShowContextInput(true);
+      }
+    } catch (e) {
+      console.error("Failed to find alternatives with context", e);
+      setShowContextInput(true);
+    } finally {
+      setLoadingAlternatives(false);
+    }
+  };
+
   const handleSelectAlternative = async (alt: AlternativeItem) => {
     // Merge the alternative info into the main data structure
-    const newData = { ...data, name: alt.name, series: alt.series, description: `${alt.reason} (User Corrected)` };
+    const newData: D56Item = { 
+        ...data, 
+        name: alt.name, 
+        series: alt.series, 
+        description: `${alt.reason} (User Corrected)`,
+        feedbackStatus: 'accepted' 
+    };
     
     // Update local state
     onUpdateData(newData);
-    setFeedbackState('accepted'); // Auto-accept after correction
     setAlternatives([]); // Clear alternatives
     
-    console.log(`[ResultCard] User corrected item to: ${newData.name}. Submitting correction...`);
-    // Send corrected data to backend for training
+    console.log(`[ResultCard] User corrected item to: ${newData.name}. Processing...`);
+    await addToInventory(newData);
     await sendFeedback(newData, imageData);
   };
 
@@ -127,6 +215,23 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Warning Section for Data Validation */}
+        {yearWarning && (
+          <div className="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-amber-700 font-medium">Data Validation Warning</p>
+                <p className="text-sm text-amber-600 mt-1">{yearWarning}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Primary Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1">
@@ -139,6 +244,24 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           </div>
         </div>
 
+        {/* Item/Model Numbers */}
+        {(data.itemNumber || data.modelNumber) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {data.itemNumber && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Item Number</label>
+                <div className="text-sm font-mono text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200">{data.itemNumber}</div>
+              </div>
+            )}
+            {data.modelNumber && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Model Number</label>
+                <div className="text-sm font-mono text-slate-800 bg-slate-50 px-2 py-1 rounded border border-slate-200">{data.modelNumber}</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Secondary Info */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-1">
@@ -147,7 +270,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Retired</label>
-            <div className="text-sm font-medium text-slate-900">{data.yearRetired || 'Active'}</div>
+            <div className="text-sm font-medium text-slate-900">
+              {getRetiredStatus(data)}
+            </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Rarity</label>
@@ -161,13 +286,30 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
 
         {/* Description & Condition */}
         <div className="space-y-4 pt-4 border-t border-slate-100">
-           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Condition Assessment</label>
-            <div className="text-sm text-slate-700 bg-amber-50 p-2 rounded-md border border-amber-100">
-              {data.estimatedCondition}
-            </div>
-          </div>
-          <div className="space-y-1">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Condition Assessment</label>
+                <div className="text-sm text-slate-700 bg-amber-50 p-2 rounded-md border border-amber-100">
+                  {data.estimatedCondition}
+                </div>
+              </div>
+              <div className="space-y-1">
+                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Special Features</label>
+                 <div className="flex gap-2 flex-wrap">
+                   {data.isLimitedEdition && (
+                     <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">Limited Edition</span>
+                   )}
+                   {data.isSigned && (
+                     <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">Artist Signed</span>
+                   )}
+                   {!data.isLimitedEdition && !data.isSigned && (
+                     <span className="text-sm text-slate-400 italic">None detected</span>
+                   )}
+                 </div>
+              </div>
+           </div>
+
+          <div className="space-y-1 pt-2">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Description</label>
             <p className="text-sm text-slate-600 leading-relaxed">
               {data.description}
@@ -196,7 +338,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
-                Confirm
+                Confirm & Add
               </button>
             </div>
           </div>
@@ -205,7 +347,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
         {/* Alternatives Section (triggered on Reject) */}
         {feedbackState === 'rejected' && (
           <div className="pt-4 border-t border-slate-100 animate-in fade-in duration-300">
-             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3 block">Alternative Matches (Search Results)</label>
+             <label className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3 block">
+               Alternative Matches {alternatives.length > 0 && `(${alternatives.length} found)`}
+             </label>
              
              {loadingAlternatives && (
                 <div className="flex items-center justify-center py-6 text-slate-500 gap-2">
@@ -217,8 +361,15 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
              <div className="grid gap-3">
                {alternatives.map((alt, idx) => (
                  <div key={idx} className="bg-white border border-slate-200 p-4 rounded-lg hover:border-blue-300 transition-colors shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="space-y-1">
-                      <div className="font-semibold text-slate-900">{alt.name}</div>
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-slate-900">{alt.name}</div>
+                        {alt.confidenceScore && (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                            {alt.confidenceScore}%
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-blue-600 font-medium">{alt.series}</div>
                       <div className="text-xs text-slate-500">{alt.reason}</div>
                     </div>
@@ -230,10 +381,61 @@ export const ResultCard: React.FC<ResultCardProps> = ({ data, imageData, onUpdat
                     </button>
                  </div>
                ))}
-               {!loadingAlternatives && alternatives.length === 0 && (
+               {!loadingAlternatives && alternatives.length === 0 && !showContextInput && (
                  <div className="text-sm text-slate-500 italic text-center py-2">No alternative matches found via search.</div>
                )}
              </div>
+
+             {/* Context Input Section - shown when no alternatives found */}
+             {!loadingAlternatives && showContextInput && (
+               <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                 <div className="flex items-start gap-2">
+                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0">
+                     <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clipRule="evenodd" />
+                   </svg>
+                   <div className="flex-1">
+                     <h4 className="text-sm font-semibold text-amber-900 mb-1">No matches found</h4>
+                     <p className="text-xs text-amber-700 mb-3">
+                       Help us find the correct item by providing additional details such as:
+                     </p>
+                     <ul className="text-xs text-amber-600 list-disc list-inside space-y-1 mb-3">
+                       <li>Specific features (e.g., "red barn with white trim")</li>
+                       <li>Text visible on the box or piece</li>
+                       <li>Village series (e.g., "Dickens Village", "North Pole")</li>
+                       <li>Approximate year or era</li>
+                     </ul>
+                   </div>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <textarea
+                     value={userContext}
+                     onChange={(e) => setUserContext(e.target.value)}
+                     placeholder="Example: This is a red brick church with a white steeple from the Dickens Village series..."
+                     className="w-full px-3 py-2 text-sm border border-amber-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
+                     rows={3}
+                   />
+                   <div className="flex gap-2">
+                     <button
+                       onClick={handleSearchWithContext}
+                       disabled={!userContext.trim()}
+                       className="flex-1 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                     >
+                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                         <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                       </svg>
+                       Search with Details
+                     </button>
+                     <button
+                       onClick={() => setShowContextInput(false)}
+                       className="px-4 py-2 bg-white text-slate-600 text-sm font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors"
+                     >
+                       Cancel
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             )}
           </div>
         )}
 
